@@ -14,6 +14,7 @@ BATCH_SIZE = 1000
 LR = 0.001
 
 onehot_action = { 
+    (0,0,0,0,0,0,0,0,0): Action.N_NULL,
     (1,0,0,0,0,0,0,0,0): Action.V_UP,
     (0,1,0,0,0,0,0,0,0): Action.V_DOWN,
     (0,0,1,0,0,0,0,0,0): Action.A_UP,
@@ -26,6 +27,7 @@ onehot_action = {
 }
 
 action_onehot = { 
+    Action.N_NULL:   [0,0,0,0,0,0,0,0,0],
     Action.V_UP:   [1,0,0,0,0,0,0,0,0],
     Action.V_DOWN: [0,1,0,0,0,0,0,0,0],
     Action.A_UP:   [0,0,1,0,0,0,0,0,0],
@@ -36,16 +38,17 @@ action_onehot = {
     Action.A_UP10:   [0,0,0,0,0,0,0,1,0],
     Action.A_DOWN10: [0,0,0,0,0,0,0,0,1] 
 }
-int_onehot = { 
-    0:   [1,0,0,0,0,0,0,0,0],
-    1:   [0,1,0,0,0,0,0,0,0],
-    2:   [0,0,1,0,0,0,0,0,0],
-    3:   [0,0,0,1,0,0,0,0,0],
-    4:   [0,0,0,0,1,0,0,0,0],
-    5:   [0,0,0,0,0,1,0,0,0],
-    6:   [0,0,0,0,0,0,1,0,0],
-    7:   [0,0,0,0,0,0,0,1,0],
-    8:   [0,0,0,0,0,0,0,0,1] 
+int_onehot = {
+    0:   [0,0,0,0,0,0,0,0,0],
+    1:   [1,0,0,0,0,0,0,0,0],
+    2:   [0,1,0,0,0,0,0,0,0],
+    3:   [0,0,1,0,0,0,0,0,0],
+    4:   [0,0,0,1,0,0,0,0,0],
+    5:   [0,0,0,0,1,0,0,0,0],
+    6:   [0,0,0,0,0,1,0,0,0],
+    7:   [0,0,0,0,0,0,1,0,0],
+    8:   [0,0,0,0,0,0,0,1,0],
+    9:   [0,0,0,0,0,0,0,0,1] 
 }
 
 action_list = [Action.A_UP,Action.A_DOWN,
@@ -69,10 +72,10 @@ action_list = [Action.A_UP,Action.A_DOWN,
             Action.FIRE]
 
 state_info = [
-            "game.angle*10",
+            "game.angle",
             "game.velocity",
-            "game.missile_loc.x+game.missile_size//2",
-            "game.missile_loc.y+game.missile_size//2",
+#            "game.missile_loc.x+game.missile_size//2",
+#            "game.missile_loc.y+game.missile_size//2",
             "game.missile_alpha",
             "game.missile_range",
             "game.shots"
@@ -99,8 +102,8 @@ class Agent:
         state = [
             game.angle,
             game.velocity,
-            game.missile_loc.x+(game.missile_size//2),
-            game.missile_loc.y+(game.missile_size//2),
+        #    game.missile_loc.x+(game.missile_size//2),
+        #    game.missile_loc.y+(game.missile_size//2),
             game.missile_alpha,
             game.missile_range,
             game.shots
@@ -123,7 +126,7 @@ class Agent:
         self.trainer.train_step(state, action, reward, next_state, done)
 
     def get_action(self, state):
-        self.epsilon = 80 - self.n_games
+        self.epsilon = 160 - self.n_games
         if random.randint(0, 200) < self.epsilon:
             move = random.choice(action_list)
             final_move = action_onehot[move]

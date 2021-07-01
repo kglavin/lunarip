@@ -4,6 +4,8 @@ from enum import Enum
 from collections import namedtuple
 import numpy as np
 import math
+
+from pygame.display import mode_ok
 import trajectory
 
 
@@ -28,15 +30,16 @@ SPEED = 600
 MAX_ITERATIONS=3000
 
 class Action(Enum):
-    V_UP = 0, 
-    V_DOWN = 1, 
-    A_UP = 2,
-    A_DOWN = 3,
-    FIRE = 4,
-    V_UP10 = 5,
-    V_DOWN10 = 6,
-    A_UP10 = 7,
-    A_DOWN10 = 8
+    N_NULL = 0,
+    V_UP = 1, 
+    V_DOWN = 2, 
+    A_UP = 3,
+    A_DOWN = 4,
+    FIRE = 5,
+    V_UP10 = 6,
+    V_DOWN10 = 7,
+    A_UP10 = 8,
+    A_DOWN10 = 9
 
 
 Point = namedtuple('Point', 'x, y')
@@ -67,10 +70,8 @@ class BallisticGameAI:
         self.missile_loc = Point(1,1)
         self.missile_alpha = math.atan(self.h-self.missile_loc.y/self.missile_loc.x)
         self.missile_range = int(math.sqrt(self.missile_loc.y**2 + self.missile_loc.x**2))
-        self.find_missile()
         self.aabattery_loc = Point(100, self.h-20)
         self.aabattery =  pygame.Rect(self.aabattery_loc.x, self.aabattery_loc.y, 15, 18 )
-        
         self.angle = math.pi / 4 
         self.velocity = 600
         self.dt = 0.005
@@ -79,6 +80,7 @@ class BallisticGameAI:
         self.y = []
         self.shotfired = False
         self.bullet_paths = []
+        self.find_missile()
 
     def play_step(self, action):
         reward = 0
@@ -113,7 +115,7 @@ class BallisticGameAI:
 
         if self.shots == 0 or self.frame_iteration > MAX_ITERATIONS:
             game_over = True
-            reward = reward + self.score
+            reward = reward + self.score*100
             return reward, game_over, self.score
     
         if self.shotfired == True:
@@ -156,7 +158,8 @@ class BallisticGameAI:
                 p = pygame.Rect(self.aabattery.x +10 +x[i],
                                 self.aabattery.y -20 -y[i], 1, 1)
                 pygame.draw.rect(self.display, white, p)
-            pygame.time.delay(20)
+            if self.want_ui > 0:
+                pygame.time.delay(20)
 
         #bullet trajectory if present
         for bullet in self.bullet_paths:
@@ -174,14 +177,15 @@ class BallisticGameAI:
 
         # slight delay to allow bullet path to be seen
         if len(self.bullet_paths) > 0:
-            pygame.time.delay(200)
+            if self.want_ui > 0:
+                pygame.time.delay(200)
 
         return
 
     def _shot_fired_reward(self,action):
         # got a new trajectory because of a fire action, check it it hits the missile 
         self.shots -= 1
-        reward = -10 # assume a miss and punish 
+        reward = -500 # assume a miss and punish 
         missile_hit = False
         self.shotfired = False
         if len(self.x) > 0:
@@ -192,7 +196,7 @@ class BallisticGameAI:
                     self.bullet_paths.append(bullet)
                     if self.missile.colliderect(bullet):
                         self.score +=1
-                        reward += 20
+                        reward += 2500
                         missile_hit=True
                         break
         # remove the trajectory 
@@ -207,41 +211,41 @@ class BallisticGameAI:
             if self.angle > self.missile_alpha:
                 reward += -10
             else:
-                reward -= 0.2
-            if self.angle <= (self.missile_alpha - incr_angle_large):
-                reward += 0.25
-            if self.angle <= (self.missile_alpha - incr_angle):
-                reward += 1
+                reward += 0.2
+                if self.angle <= (self.missile_alpha - incr_angle_large):
+                    reward += 0.25
+                if self.angle <= (self.missile_alpha - incr_angle):
+                    reward += 2.6
 
         if action == Action.A_UP10:
             if self.angle > self.missile_alpha:
                 reward += -10
             else:
-                reward -= 0.2
-            if self.angle <= (self.missile_alpha - incr_angle_large):
-                reward += 1
-            if self.angle <= (self.missile_alpha - incr_angle):
-                reward += 0.25
+                reward += 0.2
+                if self.angle <= (self.missile_alpha - incr_angle_large):
+                    reward += 2.6
+                if self.angle <= (self.missile_alpha - incr_angle):
+                    reward += - 10
 
         if action == Action.A_DOWN:
             if self.angle < self.missile_alpha:
                 reward += -10
             else:
-                reward -= 0.2
-            if self.angle >= (self.missile_alpha - incr_angle_large):
-                reward += 0.25
-            if self.angle >= (self.missile_alpha - incr_angle):
-                reward += 1
+                reward += 0.2
+                if self.angle >= (self.missile_alpha + incr_angle_large):
+                    reward += 0.25
+                if self.angle >= (self.missile_alpha + incr_angle):
+                    reward += 2.6
 
         if action == Action.A_DOWN10:
             if self.angle < self.missile_alpha:
                 reward += -10
             else:
-                reward -= 0.2
-            if self.angle >= (self.missile_alpha - incr_angle_large):
-                reward += 1
-            if self.angle >= (self.missile_alpha - incr_angle):
-                reward += 0.25
+                reward += 0.2
+                if self.angle >= (self.missile_alpha + incr_angle_large):
+                    reward += 2.6
+                if self.angle <= (self.missile_alpha + incr_angle):
+                    reward += -10
         return reward
 
 
@@ -288,8 +292,8 @@ class BallisticGameAI:
             return
 
     def find_missile(self):
-        self.missile_loc = Point(random.randint(self.w-1000, self.w-60),
-                                random.randint(self.h-750, self.h-100)) 
+        self.missile_loc = Point(random.randint(self.w-1100, self.w-60),
+                                random.randint(self.h-850, self.h-100)) 
         #self.missile_loc = Point(300+random.randint(-250,850),
         #                        300+random.randint(-50,500))
         #self.missile_loc = Point(700,self.h-200)
@@ -300,7 +304,7 @@ class BallisticGameAI:
         self.missile_range = int(math.sqrt(self.missile_loc.y**2 + self.missile_loc.x**2))
         
         self.missile = pygame.Rect(self.missile_loc.x, self.missile_loc.y, self.missile_size, self.missile_size)
-        self.angle = math.pi/4 
+        self.angle = random.randint(10,1500)/1000
     
 
 if __name__ == "__main__":
