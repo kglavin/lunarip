@@ -16,7 +16,7 @@ blue = pygame.Color('blue')
 yellow = pygame.Color('yellow')
 
 width, height = 1200, 900
-missile_size = 20
+missile_size = 100
 incr_angle = 0.02  # radians   little more than 1 degree
 incr_angle_large = 0.2 # radians 11.4 degrees
 vertical_angle = math.pi/2
@@ -64,6 +64,7 @@ class BallisticGameAI:
         self.frame_iteration = 0
         self.missile_loc = Point(1,1)
         self.missile_alpha = math.atan(self.missile_loc.y/self.missile_loc.x)
+        self.missile_range = math.sqrt(self.missile_loc.y**2 + self.missile_loc.x**2)
         self.find_missile()
         self.aabattery_loc = Point(100, self.h-20)
         self.aabattery =  pygame.Rect(self.aabattery_loc.x, self.aabattery_loc.y, 15, 18 )
@@ -171,7 +172,7 @@ class BallisticGameAI:
 
         # slight delay to allow bullet path to be seen
         if len(self.bullet_paths) > 0:
-            pygame.time.delay(50)
+            pygame.time.delay(200)
 
         return
 
@@ -269,7 +270,7 @@ class BallisticGameAI:
 
             if action == Action.FIRE and self.shots > 0:
                     self.shotfired = True
-                    self.x,self.y =  trajectory.trajectory(400,self.angle,self.velocity,self.dt)
+                    self.x,self.y =  trajectory.trajectory(1000,self.angle,self.velocity,self.dt)
             return
 
     def find_missile(self):
@@ -279,7 +280,12 @@ class BallisticGameAI:
         #                        300+random.randint(-50,500))
         #self.missile_loc = Point(700,self.h-200)
         self.missile_alpha = math.atan((self.h - self.missile_loc.y)/self.missile_loc.x)
+        self.missile_range = math.sqrt(self.missile_loc.y**2 + self.missile_loc.x**2)
+        
         self.missile = pygame.Rect(self.missile_loc.x, self.missile_loc.y, self.missile_size, self.missile_size)
+
+        self.angle = math.pi / 4 
+    
 
 if __name__ == "__main__":
 

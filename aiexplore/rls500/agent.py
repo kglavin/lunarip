@@ -68,6 +68,15 @@ action_list = [Action.A_UP,Action.A_DOWN,
             Action.A_UP10,Action.A_DOWN10,
             Action.FIRE]
 
+state_info = [
+            "game.angle*10",
+            "game.velocity",
+            "game.missile_loc.x+game.missile_size//2",
+            "game.missile_loc.y+game.missile_size//2",
+            "game.missile_alpha",
+            "game.missile_range",
+            "game.shots"
+            ]
 class Agent:
 
     def __init__(self):
@@ -81,18 +90,19 @@ class Agent:
         if os.path.exists(file_name):
             self.model = torch.load(file_name)
         else:
-            self.model = Linear_QNet(6, 64, 9)
+            self.model = Linear_QNet(len(state_info), 256, len(onehot_action)) # first parm is the lenght of the state array 
 
 
         self.trainer = QTrainer(self.model, lr=LR, gamma=self.gamma)
 
     def get_state(self, game): 
         state = [
-            game.angle*10,
+            game.angle*100,
             game.velocity,
-            game.missile_loc.x+game.missile_size//2,
-            game.missile_loc.y+game.missile_size//2,
-            game.missile_alpha,
+            game.missile_loc.x+(game.missile_size//2),
+            game.missile_loc.y+(game.missile_size//2),
+            game.missile_alpha*100,
+            game.missile_range,
             game.shots
             ]
         return np.array(state, dtype=int)
