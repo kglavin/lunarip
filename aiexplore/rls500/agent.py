@@ -97,15 +97,15 @@ class Agent:
 
     def get_state(self, game): 
         state = [
-            game.angle*100,
+            game.angle,
             game.velocity,
             game.missile_loc.x+(game.missile_size//2),
             game.missile_loc.y+(game.missile_size//2),
-            game.missile_alpha*100,
+            game.missile_alpha,
             game.missile_range,
             game.shots
             ]
-        return np.array(state, dtype=int)
+        return np.array(state, dtype=float)
 
     def remember(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done)) 

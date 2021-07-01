@@ -20,11 +20,11 @@ missile_size = 100
 incr_angle = 0.02  # radians   little more than 1 degree
 incr_angle_large = 0.2 # radians 11.4 degrees
 vertical_angle = math.pi/2
-horizontal_angle = 0.02
+horizontal_angle = 0.0
 
 ground = pygame.Rect(0, height-2, width, 2 )
 
-SPEED = 100
+SPEED = 600
 MAX_ITERATIONS=3000
 
 class Action(Enum):
@@ -46,6 +46,8 @@ class BallisticGameAI:
         self.w = w
         self.h = h
         self.missile_size = missile_size
+        self.aabattery_loc = Point(100, self.h-20)
+        self.aabattery =  pygame.Rect(self.aabattery_loc.x, self.aabattery_loc.y, 15, 18 )
         self.score = 0
         self.frame_iteration = 0
         self.shots = 0
@@ -63,8 +65,8 @@ class BallisticGameAI:
         self.score = 0
         self.frame_iteration = 0
         self.missile_loc = Point(1,1)
-        self.missile_alpha = math.atan(self.missile_loc.y/self.missile_loc.x)
-        self.missile_range = math.sqrt(self.missile_loc.y**2 + self.missile_loc.x**2)
+        self.missile_alpha = math.atan(self.h-self.missile_loc.y/self.missile_loc.x)
+        self.missile_range = int(math.sqrt(self.missile_loc.y**2 + self.missile_loc.x**2))
         self.find_missile()
         self.aabattery_loc = Point(100, self.h-20)
         self.aabattery =  pygame.Rect(self.aabattery_loc.x, self.aabattery_loc.y, 15, 18 )
@@ -163,7 +165,7 @@ class BallisticGameAI:
         # status line
         status = "angle: " + "{:.4f}".format(self.angle) + " velocity: " + str(self.velocity) 
         status = status + " shots: " + str(self.shots) + " score: " + str(self.score) 
-        status = status + " iteration: " + str(self.frame_iteration) + " (" + str(self.missile_size) +","+ "{:.4f}".format(self.missile_alpha)+")"
+        status = status + " iteration: " + str(self.frame_iteration) + " (" + str(self.missile_size) +","+ "{:.4f}".format(self.missile_alpha)+","+str(self.missile_range)+")"
         status = status + " la: " + str(self.last_action)
 
         text = font.render(status, True, white)
@@ -202,28 +204,40 @@ class BallisticGameAI:
         reward = 0
 
         if action == Action.A_UP:
-            reward -= 0.2
+            if self.angle > self.missile_alpha:
+                reward += -10
+            else:
+                reward -= 0.2
             if self.angle <= (self.missile_alpha - incr_angle_large):
                 reward += 0.25
             if self.angle <= (self.missile_alpha - incr_angle):
                 reward += 1
 
         if action == Action.A_UP10:
-            reward -= 0.2
+            if self.angle > self.missile_alpha:
+                reward += -10
+            else:
+                reward -= 0.2
             if self.angle <= (self.missile_alpha - incr_angle_large):
                 reward += 1
             if self.angle <= (self.missile_alpha - incr_angle):
                 reward += 0.25
 
         if action == Action.A_DOWN:
-            reward -= 0.2
+            if self.angle < self.missile_alpha:
+                reward += -10
+            else:
+                reward -= 0.2
             if self.angle >= (self.missile_alpha - incr_angle_large):
                 reward += 0.25
             if self.angle >= (self.missile_alpha - incr_angle):
                 reward += 1
 
         if action == Action.A_DOWN10:
-            reward -= 0.2
+            if self.angle < self.missile_alpha:
+                reward += -10
+            else:
+                reward -= 0.2
             if self.angle >= (self.missile_alpha - incr_angle_large):
                 reward += 1
             if self.angle >= (self.missile_alpha - incr_angle):
@@ -279,12 +293,14 @@ class BallisticGameAI:
         #self.missile_loc = Point(300+random.randint(-250,850),
         #                        300+random.randint(-50,500))
         #self.missile_loc = Point(700,self.h-200)
-        self.missile_alpha = math.atan((self.h - self.missile_loc.y)/self.missile_loc.x)
-        self.missile_range = math.sqrt(self.missile_loc.y**2 + self.missile_loc.x**2)
+        
+        #self.missile_alpha = math.atan((self.h - self.missile_loc.y)/self.missile_loc.x)
+
+        self.missile_alpha = math.atan((self.aabattery.y-20-self.missile_loc.y)/(self.missile_loc.x-self.aabattery.x+10))
+        self.missile_range = int(math.sqrt(self.missile_loc.y**2 + self.missile_loc.x**2))
         
         self.missile = pygame.Rect(self.missile_loc.x, self.missile_loc.y, self.missile_size, self.missile_size)
-
-        self.angle = math.pi / 4 
+        self.angle = math.pi/4 
     
 
 if __name__ == "__main__":
