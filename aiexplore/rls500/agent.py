@@ -69,7 +69,11 @@ action_list = [Action.A_UP,Action.A_DOWN,
 
 action_list = [Action.A_UP,Action.A_DOWN,
             Action.A_UP10,Action.A_DOWN10,
-            Action.FIRE]
+            Action.FIRE,
+            Action.A_UP,Action.A_DOWN,
+            Action.A_UP10,Action.A_DOWN10,
+            Action.A_UP,Action.A_DOWN,
+            Action.A_UP10,Action.A_DOWN10]
 
 state_info = [
             "game.angle",
@@ -125,9 +129,15 @@ class Agent:
     def train_short_memory(self, state, action, reward, next_state, done):
         self.trainer.train_step(state, action, reward, next_state, done)
 
+
+    def _app_specific_hint(self,game):
+        # instead of guessing provide a hint based on knowledge of the application
+        return game.hint()
+
     def get_action(self, state):
-        self.epsilon = 160 - self.n_games
-        if random.randint(0, 200) < self.epsilon:
+        self.epsilon = 16000 - self.n_games
+    
+        if random.randint(0, 20000) < self.epsilon:
             move = random.choice(action_list)
             final_move = action_onehot[move]
         else:
@@ -151,7 +161,10 @@ def train():
         state_old = agent.get_state(game)
 
         # get move
-        final_move = agent.get_action(state_old)
+        if random.randint(0,2) == 1:
+            final_move = action_onehot[agent._app_specific_hint(game)]
+        else:
+            final_move = agent.get_action(state_old)
         action = onehot_action[tuple(final_move)]
 
         # perform move and get new state

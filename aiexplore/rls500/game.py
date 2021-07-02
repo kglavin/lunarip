@@ -306,6 +306,25 @@ class BallisticGameAI:
         self.missile = pygame.Rect(self.missile_loc.x, self.missile_loc.y, self.missile_size, self.missile_size)
         self.angle = random.randint(10,1500)/1000
     
+    def hint(self):
+        e_minus = abs(self.angle - self.missile_alpha)
+        e_plus = abs(self.missile_alpha - self.angle)
+
+        if e_minus < incr_angle or e_plus < incr_angle:
+            return Action.FIRE
+
+        if self.angle > self.missile_alpha:
+            if e_minus > incr_angle_large:
+                return Action.A_DOWN10
+            if e_minus > incr_angle:
+                return Action.A_DOWN
+        
+        if self.angle < self.missile_alpha:
+            if e_plus > incr_angle_large:
+                return Action.A_UP10
+            if e_plus > incr_angle:
+                return Action.A_UP
+            
 
 if __name__ == "__main__":
 
