@@ -2,88 +2,44 @@ import torch
 import random
 import numpy as np
 from collections import deque
+
 from game import BallisticGameAI, Action, Point
 from model import Linear_QNet, QTrainer
 from helper import plot
 import os
+import math
 
 #derived from https://github.com/python-engineer/snake-ai-pytorch
 
 MAX_MEMORY = 100_000
 BATCH_SIZE = 1000
-LR = 0.001
+LR = 0.0005
 
 onehot_action = { 
-    (0,0,0,0,0,0,0,0,0): Action.N_NULL,
-    (1,0,0,0,0,0,0,0,0): Action.V_UP,
-    (0,1,0,0,0,0,0,0,0): Action.V_DOWN,
-    (0,0,1,0,0,0,0,0,0): Action.A_UP,
-    (0,0,0,1,0,0,0,0,0): Action.A_DOWN,
-    (0,0,0,0,1,0,0,0,0): Action.FIRE,
-    (0,0,0,0,0,1,0,0,0): Action.V_UP10,
-    (0,0,0,0,0,0,1,0,0): Action.V_DOWN10,
-    (0,0,0,0,0,0,0,1,0): Action.A_UP10,
-    (0,0,0,0,0,0,0,0,1): Action.A_DOWN10
+    (1,0,0): Action.A_UP,
+    (0,1,0): Action.A_DOWN,
+    (0,0,1): Action.FIRE
 }
 
 action_onehot = { 
-    Action.N_NULL:   [0,0,0,0,0,0,0,0,0],
-    Action.V_UP:   [1,0,0,0,0,0,0,0,0],
-    Action.V_DOWN: [0,1,0,0,0,0,0,0,0],
-    Action.A_UP:   [0,0,1,0,0,0,0,0,0],
-    Action.A_DOWN: [0,0,0,1,0,0,0,0,0],
-    Action.FIRE:   [0,0,0,0,1,0,0,0,0],
-    Action.V_UP10: [0,0,0,0,0,1,0,0,0],
-    Action.V_DOWN10: [0,0,0,0,0,0,1,0,0],
-    Action.A_UP10:   [0,0,0,0,0,0,0,1,0],
-    Action.A_DOWN10: [0,0,0,0,0,0,0,0,1] 
+    Action.A_UP:   [1,0,0],
+    Action.A_DOWN: [0,1,0],
+    Action.FIRE:   [0,0,1], 
 }
 int_onehot = {
-    0:   [0,0,0,0,0,0,0,0,0],
-    1:   [1,0,0,0,0,0,0,0,0],
-    2:   [0,1,0,0,0,0,0,0,0],
-    3:   [0,0,1,0,0,0,0,0,0],
-    4:   [0,0,0,1,0,0,0,0,0],
-    5:   [0,0,0,0,1,0,0,0,0],
-    6:   [0,0,0,0,0,1,0,0,0],
-    7:   [0,0,0,0,0,0,1,0,0],
-    8:   [0,0,0,0,0,0,0,1,0],
-    9:   [0,0,0,0,0,0,0,0,1] 
+    0:   [1,0,0],
+    1:   [0,1,0],
+    2:   [0,0,1]
 }
 
-action_list = [Action.A_UP,Action.A_DOWN,
-            Action.A_UP,Action.A_DOWN,
-            Action.A_UP,Action.A_DOWN,
-            Action.A_UP,Action.A_DOWN,
-            Action.A_UP,Action.A_DOWN,
-            Action.A_UP,Action.A_DOWN,
-            Action.A_UP,Action.A_DOWN,
-            Action.A_UP,Action.A_DOWN,
-            Action.A_UP,Action.A_DOWN,
-            Action.A_UP10,Action.A_DOWN10,
-            Action.FIRE,
-            Action.FIRE,
-            Action.A_UP,Action.A_DOWN,
-            Action.A_UP10,Action.A_DOWN10,
-            Action.A_UP,Action.A_DOWN]
 
-action_list = [Action.A_UP,Action.A_DOWN,
-            Action.A_UP10,Action.A_DOWN10,
-            Action.FIRE,
-            Action.A_UP,Action.A_DOWN,
-            Action.A_UP10,Action.A_DOWN10,
-            Action.A_UP,Action.A_DOWN,
-            Action.A_UP10,Action.A_DOWN10]
+action_list = [Action.A_UP,Action.A_DOWN,Action.FIRE]
 
 state_info = [
-            "game.angle",
-            "game.velocity",
-#            "game.missile_loc.x+game.missile_size//2",
-#            "game.missile_loc.y+game.missile_size//2",
-            "game.missile_alpha",
-            "game.missile_range",
-            "game.shots"
+            'angle',
+            'range'
             ]
+
 class Agent:
 
     def __init__(self):
@@ -91,37 +47,47 @@ class Agent:
         self.epsilon = 0 # randomness
         self.gamma = 0.9 # discount rate
         self.memory = deque(maxlen=MAX_MEMORY)
+        self.hint_memory = deque(maxlen=MAX_MEMORY)
         self.model = None
   
         file_name = os.path.join('./model', 'model.pth')
         if os.path.exists(file_name):
             self.model = torch.load(file_name)
+            print("loaded")
         else:
-            self.model = Linear_QNet(len(state_info), 256, len(onehot_action)) # first parm is the lenght of the state array 
-
+            self.model = Linear_QNet(len(state_info), 3, len(onehot_action)) # first parm is the lenght of the state array 
+        for param_tensor in self.model.state_dict():
+            print(param_tensor, "\t", self.model.state_dict()[param_tensor].size())
+            print(param_tensor, "\t", self.model.state_dict()[param_tensor])
 
         self.trainer = QTrainer(self.model, lr=LR, gamma=self.gamma)
 
     def get_state(self, game): 
-        state = [
-            game.angle,
-            game.velocity,
-        #    game.missile_loc.x+(game.missile_size//2),
-        #    game.missile_loc.y+(game.missile_size//2),
-            game.missile_alpha,
-            game.missile_range,
-            game.shots
-            ]
-        return np.array(state, dtype=float)
+        angle = round(math.degrees(game.angle)-math.degrees(game.missile_alpha),3)
+        #return np.array(state, dtype=float)
+        state = [angle,game.missile_range]
+        return np.array(state,dtype=float)
 
     def remember(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done)) 
+    
+    def hint_remember(self, state, action, reward, next_state, done):
+        self.hint_memory.append((state, action, reward, next_state, done)) 
 
     def train_long_memory(self):
         if len(self.memory) > BATCH_SIZE:
             mini_sample = random.sample(self.memory, BATCH_SIZE)
         else:
             mini_sample = self.memory
+
+        states, actions, rewards, next_states, dones = zip(*mini_sample)
+        self.trainer.train_step(states, actions, rewards, next_states, dones)
+
+    def train_long_memory_hint(self):
+        if len(self.hint_memory) > BATCH_SIZE:
+            mini_sample = random.sample(self.hint_memory, BATCH_SIZE)
+        else:
+            mini_sample = self.hint_memory
 
         states, actions, rewards, next_states, dones = zip(*mini_sample)
         self.trainer.train_step(states, actions, rewards, next_states, dones)
@@ -135,15 +101,14 @@ class Agent:
         return game.hint()
 
     def get_action(self, state):
-        self.epsilon = 16000 - self.n_games
-    
-        if random.randint(0, 20000) < self.epsilon:
+        self.epsilon = 30  # - self.n_games
+        if random.randint(0, 240) < self.epsilon:
             move = random.choice(action_list)
             final_move = action_onehot[move]
         else:
-            state0 = torch.tensor(state, dtype=torch.float)
+            state0 = torch.tensor(state, dtype=torch.float32)
             prediction = self.model(state0)
-            move = torch.argmax(prediction).item()
+            move = int(torch.argmax(prediction).item())
             final_move = int_onehot[move]
 
         return final_move
@@ -153,29 +118,46 @@ def train():
     plot_scores = []
     plot_mean_scores = []
     total_score = 0
+    total_reward = 0
     record = 0
     agent = Agent()
     game = BallisticGameAI()
+    game_reward = 0
     while True:
+        hint = False
         # get old state
         state_old = agent.get_state(game)
 
         # get move
-        if random.randint(0,2) == 1:
+        
+        # when enabled, gets a hint from the game, to speed up finding good moves.
+        if random.randint(0,4) == 1: # disabled
             final_move = action_onehot[agent._app_specific_hint(game)]
+            hint = True
         else:
             final_move = agent.get_action(state_old)
         action = onehot_action[tuple(final_move)]
 
         # perform move and get new state
-        reward, done, score = game.play_step(action)
+        reward, done, score,missile_hit = game.play_step(action)
         state_new = agent.get_state(game)
+        game_reward += reward
+
+        # only add a new missile after the new state has been recorded for use in training
+                # add a new missile if needed
+        if missile_hit == True:
+            game.find_missile()
+            game.update_ui()
+
 
         # train short memory
         agent.train_short_memory(state_old, final_move, reward, state_new, done)
 
         # remember
         agent.remember(state_old, final_move, reward, state_new, done)
+        if hint == True:
+            agent.hint_remember(state_old, final_move, reward, state_new, done)
+            hint = False
 
         if game.want_save == True:
             agent.model.save()
@@ -185,11 +167,59 @@ def train():
             # train long memory, plot result
             game.reset()
             agent.n_games += 1
+            #agent.train_long_memory_hint()
             agent.train_long_memory()
+            agent.train_long_memory_hint()
+
+
+            total_reward += game_reward
+            if score >= record:
+                record = score
+                agent.model.save()
+
+            print('Game', agent.n_games, 'Score', score, 'Record:', record, "Game_Reward: ", game_reward)
+            game_reward = 0
+            plot_scores.append(score)
+            total_score += score
+            mean_score = total_score / agent.n_games
+            plot_mean_scores.append(mean_score)
+            plot(plot_scores, plot_mean_scores)
+
+
+def play(speed=60):
+    plot_scores = []
+    plot_mean_scores = []
+    total_score = 0
+    record = 0
+    agent = Agent()
+    game = BallisticGameAI(speed=speed)
+    reward  = 0
+    while True:
+        # get old state
+        state = agent.get_state(game)
+
+        state0 = torch.tensor(state, dtype=torch.float32)
+        prediction = agent.model(state0)
+        move = int(torch.argmax(prediction).item())
+        final_move = int_onehot[move]
+        #final_move = action_onehot[agent._app_specific_hint(game)]
+        action = onehot_action[tuple(final_move)]
+        reward, done, score, missile_hit = game.play_step(action)
+        state_new = agent.get_state(game)
+        # add a new missile if needed
+        if missile_hit == True:
+            game.find_missile()
+            game.update_ui()
+
+
+        print("s: ",state[0],  " action: ", action, " ns: ", state_new[0])
+        if done:
+            print("--------------------------------------------------------")
+            game.reset()
+            agent.n_games += 1
 
             if score > record:
                 record = score
-                agent.model.save()
 
             print('Game', agent.n_games, 'Score', score, 'Record:', record)
 
@@ -199,6 +229,6 @@ def train():
             plot_mean_scores.append(mean_score)
             plot(plot_scores, plot_mean_scores)
 
-
 if __name__ == '__main__':
     train()
+    #play()

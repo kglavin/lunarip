@@ -7,19 +7,38 @@ import os
 #derived from https://github.com/python-engineer/snake-ai-pytorch
 
 class Linear_QNet(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size):
+    def __init__(self,input_size, hidden_size, output_size):
         super().__init__()
-        self.linear1 = nn.Linear(input_size, hidden_size)
-        self.linear2 = nn.Linear(hidden_size, output_size)
-        #self.linear1 = nn.Linear(input_size, hidden_size)
-        #self.linearA = nn.Linear(hidden_size, hidden_size)
-        #self.linear2 = nn.Linear(hidden_size, output_size)
+        self.linear_relu_stack = nn.Sequential(
+            nn.Linear(input_size, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, output_size)
+            #nn.ReLU(),
+            #nn.Linear(output_size, output_size),
+            #nn.ReLU()
+      
+        )
 
     def forward(self, x):
-        x = F.relu(self.linear1(x))
-        #x = F.relu(self.linearA(x))
-        x = self.linear2(x)
-        return x
+        return self.linear_relu_stack(x)
+
+
+#class Linear_QNet(nn.Module):
+#    def __init__(self, input_size, hidden_size, output_size):
+#        super().__init__()
+#        #self.linear1 = nn.Linear(input_size, hidden_size)
+#        #self.linear2 = nn.Linear(hidden_size, output_size)
+#        self.linear1 = nn.Linear(input_size, hidden_size)
+#        self.linearA = nn.Linear(hidden_size, hidden_size+16)
+#        self.linearB = nn.Linear(hidden_size+16, hidden_size)
+#        self.linear2 = nn.Linear(hidden_size, output_size)
+#
+#    def forward(self, x):
+#        x = F.relu(self.linear1(x))
+#        x = F.relu(self.linearA(x))
+#        x = F.relu(self.linearB(x))
+#        x = self.linear2(x)
+#        return x
 
     def save(self, file_name='model.pth'):
         model_folder_path = './model'
@@ -28,12 +47,9 @@ class Linear_QNet(nn.Module):
 
         file_name = os.path.join(model_folder_path, file_name)
         torch.save(self, file_name)
-
-    def load(self,file_name='model.pth'):
-        model_folder_path = './model'
-        file_name = os.path.join(model_folder_path, file_name)
-        if os.path.exists(file_name):
-            model = torch.load(file_name)
+        for param_tensor in self.state_dict():
+            print(param_tensor, "\t", self.state_dict()[param_tensor].size())
+            print(param_tensor, "\t", self.state_dict()[param_tensor])
 
 class QTrainer:
     def __init__(self, model, lr, gamma):
@@ -44,10 +60,10 @@ class QTrainer:
         self.criterion = nn.MSELoss()
 
     def train_step(self, state, action, reward, next_state, done):
-        state = torch.tensor(state, dtype=torch.float)
-        next_state = torch.tensor(next_state, dtype=torch.float)
-        action = torch.tensor(action, dtype=torch.long)
-        reward = torch.tensor(reward, dtype=torch.float)
+        state = torch.tensor(state, dtype=torch.float32)
+        next_state = torch.tensor(next_state, dtype=torch.float32)
+        action = torch.tensor(action, dtype=torch.int32)
+        reward = torch.tensor(reward, dtype=torch.float32)
         # (n, x)
 
         if len(state.shape) == 1:
