@@ -15,8 +15,7 @@ class Linear_QNet(nn.Module):
             nn.Linear(hidden_size, output_size)
             #nn.ReLU(),
             #nn.Linear(output_size, output_size),
-            #nn.ReLU()
-      
+            #nn.ReLU()   
         )
 
     def forward(self, x):
@@ -58,8 +57,17 @@ class QTrainer:
         self.model = model
         self.optimizer = optim.Adam(model.parameters(), lr=self.lr)
         self.criterion = nn.MSELoss()
+        self.iterations = 0
 
     def train_step(self, state, action, reward, next_state, done):
+        self.iterations +=1 
+        if self.iterations > 100_000:
+            self.iterations = 0
+            print("dropping learning rate ",self.lr,self.lr/10)
+            self.lr = self.lr / 10
+           
+            self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
+
         state = torch.tensor(state, dtype=torch.float32)
         next_state = torch.tensor(next_state, dtype=torch.float32)
         action = torch.tensor(action, dtype=torch.int32)
@@ -91,7 +99,6 @@ class QTrainer:
         self.optimizer.zero_grad()
         loss = self.criterion(target, pred)
         loss.backward()
-
         self.optimizer.step()
 
 

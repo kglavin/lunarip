@@ -11,9 +11,9 @@ import math
 
 #derived from https://github.com/python-engineer/snake-ai-pytorch
 
-MAX_MEMORY = 100_000
+MAX_MEMORY = 1_000_000
 BATCH_SIZE = 1000
-LR = 0.0005
+LR = 0.001
 
 onehot_action = { 
     (1,0,0): Action.A_UP,
@@ -44,10 +44,12 @@ class Agent:
 
     def __init__(self):
         self.n_games = 0
-        self.epsilon = 0 # randomness
+        self.epsilon = 30 # randomness
+        self.epsilon_max = 2
         self.gamma = 0.9 # discount rate
         self.memory = deque(maxlen=MAX_MEMORY)
         self.hint_memory = deque(maxlen=MAX_MEMORY)
+        self.synthetic_memory = deque(maxlen=MAX_MEMORY//10)
         self.model = None
   
         file_name = os.path.join('./model', 'model.pth')
@@ -55,12 +57,14 @@ class Agent:
             self.model = torch.load(file_name)
             print("loaded")
         else:
-            self.model = Linear_QNet(len(state_info), 3, len(onehot_action)) # first parm is the lenght of the state array 
+            self.model = Linear_QNet(len(state_info), 12, len(onehot_action)) # first parm is the lenght of the state array 
         for param_tensor in self.model.state_dict():
             print(param_tensor, "\t", self.model.state_dict()[param_tensor].size())
             print(param_tensor, "\t", self.model.state_dict()[param_tensor])
 
         self.trainer = QTrainer(self.model, lr=LR, gamma=self.gamma)
+
+
 
     def get_state(self, game): 
         angle = round(math.degrees(game.angle)-math.degrees(game.missile_alpha),3)
@@ -68,8 +72,28 @@ class Agent:
         state = [angle,game.missile_range]
         return np.array(state,dtype=float)
 
+    def synthetic_data(self):
+        for r in range(1,1200):
+            state = [0, r]
+            action = action_onehot[Action.FIRE]
+            reward = 1600
+            next_state = [0, r]
+            done = False
+            self.synthetic_memory.append((state, action, reward, next_state, done))
+
+    def synthetic_train(self):
+        if len(self.synthetic_memory) > 0:
+            for c in range(1,3):
+                if len(self.missile_synthetic_memory) > BATCH_SIZE//100:
+                    mini_sample = random.sample(self.synthetic_memory, BATCH_SIZE//100)
+                else:
+                    mini_sample = random.sample(self.synthetic_memory, len(self.missile_synthetic_memory))
+                states, actions, rewards, next_states, dones = zip(*mini_sample)
+                self.trainer.train_step(states, actions, rewards, next_states, dones)
+
+
     def remember(self, state, action, reward, next_state, done):
-        self.memory.append((state, action, reward, next_state, done)) 
+            self.memory.append((state, action, reward, next_state, done)) 
     
     def hint_remember(self, state, action, reward, next_state, done):
         self.hint_memory.append((state, action, reward, next_state, done)) 
@@ -79,30 +103,30 @@ class Agent:
             mini_sample = random.sample(self.memory, BATCH_SIZE)
         else:
             mini_sample = self.memory
-
         states, actions, rewards, next_states, dones = zip(*mini_sample)
         self.trainer.train_step(states, actions, rewards, next_states, dones)
+
 
     def train_long_memory_hint(self):
         if len(self.hint_memory) > BATCH_SIZE:
             mini_sample = random.sample(self.hint_memory, BATCH_SIZE)
         else:
-            mini_sample = self.hint_memory
-
+            mini_sample = srandom.sample(self.hint_memory, len(self.hint_memory))
         states, actions, rewards, next_states, dones = zip(*mini_sample)
         self.trainer.train_step(states, actions, rewards, next_states, dones)
 
+ 
     def train_short_memory(self, state, action, reward, next_state, done):
         self.trainer.train_step(state, action, reward, next_state, done)
-
 
     def _app_specific_hint(self,game):
         # instead of guessing provide a hint based on knowledge of the application
         return game.hint()
 
     def get_action(self, state):
-        self.epsilon = 30  # - self.n_games
-        if random.randint(0, 240) < self.epsilon:
+        if (self.n_games % 10) == 0:
+            self.epsilon_max += 1
+        if random.randint(0, self.epsilon_max) < self.epsilon:
             move = random.choice(action_list)
             final_move = action_onehot[move]
         else:
@@ -131,7 +155,7 @@ def train():
         # get move
         
         # when enabled, gets a hint from the game, to speed up finding good moves.
-        if random.randint(0,4) == 1: # disabled
+        if random.randint(0,3) == 1: # disabled
             final_move = action_onehot[agent._app_specific_hint(game)]
             hint = True
         else:
@@ -167,9 +191,8 @@ def train():
             # train long memory, plot result
             game.reset()
             agent.n_games += 1
-            #agent.train_long_memory_hint()
             agent.train_long_memory()
-            agent.train_long_memory_hint()
+            #agent.train_long_memory_hint()
 
 
             total_reward += game_reward
@@ -177,7 +200,7 @@ def train():
                 record = score
                 agent.model.save()
 
-            print('Game', agent.n_games, 'Score', score, 'Record:', record, "Game_Reward: ", game_reward)
+            print('Game', agent.n_games, 'Score', score, 'Record:', record, "Game_Reward: ", game_reward, " Mem: ", len(agent.memory))
             game_reward = 0
             plot_scores.append(score)
             total_score += score

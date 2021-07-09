@@ -35,6 +35,20 @@ class Action(Enum):
     FIRE = 2
 
 
+ANGLE_LARGE = 0.2
+
+ANGLE_UP = 0.0251
+ANGLE_UP_SMALL = 0.0055
+
+ANGLE_DOWN = 0.025
+ANGLE_DOWN_SMALL = 0.0049
+
+HIT_REWARD = 500
+MOVE_PENALTY = -10
+MOVE_REWARD_NORMAL = 10
+MOVE_REWARD_LARGE = 20
+
+
 Point = namedtuple('Point', 'x, y')
 
 class BallisticGameAI:
@@ -95,11 +109,11 @@ class BallisticGameAI:
         if keys_pressed[pygame.K_c]:
             self.want_ui = 0
         if keys_pressed[pygame.K_UP]:
-            self.missile_size += 10
+            self.missile_size += 1
             if self.missile_size > 300:
                 self.missile_size = 300
         if keys_pressed[pygame.K_DOWN]:
-            self.missile_size -= 10
+            self.missile_size -= 1
             if self.missile_size < 10:
                 self.missile_size = 10
 
@@ -168,13 +182,12 @@ class BallisticGameAI:
         if len(self.bullet_paths) > 0:
             if self.want_ui > 0:
                 pygame.time.delay(200)
-
         return
 
     def _shot_fired_reward(self,action):
         # got a new trajectory because of a fire action, check it it hits the missile 
         self.shots -= 1
-        reward = -1 # assume a miss and punish 
+        reward = -100 # assume a miss and punish 
         missile_hit = False
         self.shotfired = False
         if len(self.x) > 0:
@@ -185,8 +198,13 @@ class BallisticGameAI:
                     self.bullet_paths.append(bullet)
                     if self.missile.colliderect(bullet):
                         self.score +=1
-                        reward += 2000
+                        reward += HIT_REWARD
                         missile_hit=True
+                        angle = math.degrees(self.angle)-math.degrees(self.missile_alpha)
+                        #if angle < -0.05:
+                        #    reward += 1000 
+                        #if angle < -0.005:
+                        #    reward += 5000 
                         break
         # remove the trajectory 
         self.x = []
@@ -196,42 +214,35 @@ class BallisticGameAI:
     def _close_angle_reward(self,action):
         reward = 0
         angle = math.degrees(self.angle)-math.degrees(self.missile_alpha)
-
         if action == Action.A_UP:
-            if angle > 0.025:
-                reward += -5
-            if angle < -0.05:
-                reward += 10 
-            if angle < -0.005:
-                reward += 100 
-
+            if angle > ANGLE_DOWN_SMALL:
+                reward += MOVE_PENALTY
+            if angle < -ANGLE_UP:
+                reward += MOVE_REWARD_NORMAL
+            if angle < -ANGLE_UP_SMALL:
+                reward += MOVE_REWARD_LARGE
+        if action == Action.A_DOWN:
+            if angle > ANGLE_DOWN_SMALL:
+                reward += MOVE_REWARD_LARGE
+            if angle > ANGLE_DOWN:
+                reward += MOVE_REWARD_NORMAL
+            if angle < -ANGLE_UP:
+                reward += MOVE_PENALTY
             if angle == 0 or angle == 1 or angle ==-1:
                 pass
-    
-        if action == Action.A_DOWN:
-            if angle > 0.26:
-                reward += 60
-            if angle > 0.026:
-                reward += 10
-            if angle < -0.06:
-                reward += -5
-            if angle == 0 or angle == 1 or angle ==-1:
-                passc
-
         return reward
 
 
     def _move(self, action):
-
             if action == Action.A_UP and self.angle < math.pi/2:
-                self.angle += 0.005
+                self.angle += ANGLE_UP_SMALL
                 if self.angle > math.pi/2:
-                    self.angle = math.pi/2+0.05
+                    self.angle = math.pi/2
 
-            if action == Action.A_DOWN and self.angle > 0.01:
-                self.angle -= 0.005
+            if action == Action.A_DOWN and self.angle > ANGLE_DOWN_SMALL:
+                self.angle -= ANGLE_DOWN_SMALL
                 if self.angle <= 0.0:
-                    self.angle = 0.0
+                    self.angle = ANGLE_DOWN_SMALL
 
             if action == Action.FIRE:
                     self.shotfired = True
@@ -240,8 +251,8 @@ class BallisticGameAI:
 
     def find_missile(self):
 
-        self.missile_loc = Point(random.randint(self.w-1100, self.w-60),
-                                random.randint(self.h-900, self.h-100)) 
+        self.missile_loc = Point(random.randint(self.w-1120, self.w-60),
+                                random.randint(self.h-900, self.h-50)) 
         ay = self.aabattery.y-2-(self.missile_loc.y+self.missile_size//2)
         ax = (self.missile_loc.x+self.missile_size//2)-self.aabattery.x+10
         self.missile_alpha = math.atan(ay/ax)
@@ -252,16 +263,13 @@ class BallisticGameAI:
     def hint(self):
 
         angle = math.degrees(self.angle)-math.degrees(self.missile_alpha)
-        if angle < 0.005 and angle > -0.005:
+        if angle < ANGLE_DOWN_SMALL and angle > -ANGLE_UP_SMALL:
             return Action.FIRE
-
-        if angle > 0.005:
-            return Action.A_DOWN
-        
-        if angle < -0.005:
-            return Action.A_UP
-         
-        return Action.A_UP
+        if angle >= ANGLE_DOWN:
+            return Action.A_DOWN  
+        if angle <= -ANGLE_UP:
+            return Action.A_UP     
+        return random.choice([Action.A_UP, Action.A_DOWN, Action.FIRE])
 
 if __name__ == "__main__":
 
