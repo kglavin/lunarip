@@ -43,6 +43,8 @@ ANGLE_UP_SMALL = 0.0055
 ANGLE_DOWN = 0.025
 ANGLE_DOWN_SMALL = 0.0049
 
+ANGLE_FIRE_WOBBLE = 0.0027
+
 HIT_REWARD = 500
 MOVE_PENALTY = -10
 MOVE_REWARD_NORMAL = 10
@@ -129,6 +131,7 @@ class BallisticGameAI:
         if self.shotfired == True:
             r,missile_hit = self._shot_fired_reward(action)
             reward += r
+            self.angle += random.choice([2*-ANGLE_FIRE_WOBBLE,-ANGLE_FIRE_WOBBLE,ANGLE_FIRE_WOBBLE,2*ANGLE_FIRE_WOBBLE])
 
         #update ui and clock
         if self.want_ui > 0:

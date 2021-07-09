@@ -3,7 +3,7 @@ import random
 import numpy as np
 from collections import deque
 
-from game import BallisticGameAI, Action, Point
+from game import BallisticGameAI, Action, Point,ANGLE_FIRE_WOBBLE
 from model import Linear_QNet, QTrainer
 from helper import plot
 import os
@@ -169,7 +169,7 @@ def train():
 
         # only add a new missile after the new state has been recorded for use in training
                 # add a new missile if needed
-        if missile_hit == True:
+        if missile_hit == True:    
             game.find_missile()
             game.update_ui()
 
@@ -253,5 +253,5 @@ def play(speed=60):
             plot(plot_scores, plot_mean_scores)
 
 if __name__ == '__main__':
-    train()
-    #play()
+    #train()
+    play()
