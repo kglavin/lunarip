@@ -18,7 +18,7 @@ blue = pygame.Color('blue')
 yellow = pygame.Color('yellow')
 
 width, height = 1200, 900
-missile_size = 63
+missile_size = 35
 incr_angle = 0.011  # radians   little more than 1 degree
 incr_angle_large = 0.1 # radians 11.4 degrees
 vertical_angle = math.pi/2
