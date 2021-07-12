@@ -51,21 +51,23 @@ class Linear_QNet(nn.Module):
             print(param_tensor, "\t", self.state_dict()[param_tensor])
 
 class QTrainer:
-    def __init__(self, model, lr, gamma):
+    def __init__(self, model, lr, gamma,decay_iterations=50_000, decay_ratio = 4):
         self.lr = lr
         self.gamma = gamma
+        self.decay_iterations = decay_iterations
+        self.decay_ratio = decay_ratio
         self.model = model
         self.optimizer = optim.Adam(model.parameters(), lr=self.lr)
         self.criterion = nn.MSELoss()
         self.iterations = 0
 
     def train_step(self, state, action, reward, next_state, done):
-        self.iterations +=1 
-        if self.iterations > 100_000:
+        BATCH_SIZE = 1
+        self.iterations += BATCH_SIZE
+        if self.iterations > self.decay_iterations:
             self.iterations = 0
-            print("dropping learning rate ",self.lr,self.lr/10)
-            self.lr = self.lr / 10
-           
+            print("dropping learning rate ",self.lr,self.lr/self.decay_ratio)
+            self.lr = self.lr / self.decay_ratio
             self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
 
         state = torch.tensor(state, dtype=torch.float32)
