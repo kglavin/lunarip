@@ -390,6 +390,6 @@ def play(speed=4,filename='model.pth'):
             plot(plot_scores, plot_mean_scores,'Playing')
 
 if __name__ == '__main__':
-    train()
+    #train()
     #supertrain(lr=0.0001,decay_iterations=100_000,decay_ratio = 2,episodes=6000)
-    play(filename='model.pth')
+    play(speed=60,filename='model.pth')
