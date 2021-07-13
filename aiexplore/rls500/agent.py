@@ -14,7 +14,7 @@ import math
 MAX_MEMORY = 100_000
 SYNTHETIC_MAX_MEMORY = 3_000_000
 BATCH_SIZE = 1000
-LR = 0.001
+LR = 0.0002
 #LR = 0.002
 
 onehot_action = { 
@@ -51,9 +51,9 @@ state_info = [
 
 class Agent:
 
-    def __init__(self,lr=LR,filename='model.pth',decay_iterations=50_000, decay_ratio = 4):
+    def __init__(self,lr=LR,filename='model.pth',decay_iterations=50_000, decay_ratio = 1.65):
         self.n_games = 0
-        self.epsilon = 60 # randomness
+        self.epsilon = 240 # randomness
         self.epsilon_max = 2
         self.gamma = 0.9 # discount rate
         self.decay_iterations = decay_iterations
@@ -260,7 +260,7 @@ def train():
     agent = Agent(lr=LR)
     game = BallisticGameAI()
     game_reward = 0
-    episode = 500_000
+    episode = 1_000_000
     while episode > 0:
         episode -= 1
         hint = False
@@ -270,7 +270,7 @@ def train():
         # get move
         
         # when enabled, gets a hint from the game, to speed up finding good moves.
-        if random.randint(0,8) == 1: # disabled
+        if random.randint(0,5) == 1: # disabled
             final_move = action_onehot[agent._app_specific_hint(game)]
             hint = True
         else:
@@ -306,10 +306,10 @@ def train():
             # train long memory, plot result
             game.reset()
             agent.n_games += 1
-            if agent.n_games % 2 == 0:
-                agent.train_long_memory()
-            else:
-                agent.train_long_memory_with_synthetic()
+            #if agent.n_games % 2 == 0:
+            agent.train_long_memory()
+            #else:
+            #    agent.train_long_memory_with_synthetic()
             #agent.train_long_memory_hint()
 
 
@@ -318,7 +318,7 @@ def train():
                 record = score
                 agent.model.save()
 
-            print('Game', agent.n_games, 'Score', score, 'Record:', record, "Game_Reward: ", game_reward, " Mem: ", len(agent.memory)," lr ",agent.trainer.lr)
+            print('Game', agent.n_games, 'Score', score, 'Record:', record, "Game_Reward: ", game_reward, " Mem: ", len(agent.memory)," lr ",agent.trainer.lr, " Episode ", episode)
             game_reward = 0
             plot_scores.append(score)
             total_score += score
@@ -326,7 +326,7 @@ def train():
             plot_mean_scores.append(mean_score)
             plot(plot_scores, plot_mean_scores,'Training')
 
-def supertrain(lr=LR,decay_iterations = 100_000,decay_ratio = 2, episodes=6000):
+def supertrain(lr=LR,decay_iterations = 100_000,decay_ratio = 1.1, episodes=6000):
     plot_scores = []
     plot_mean_scores = []
     total_score = 0
@@ -390,6 +390,6 @@ def play(speed=4,filename='model.pth'):
             plot(plot_scores, plot_mean_scores,'Playing')
 
 if __name__ == '__main__':
-    #train()
+    train()
     #supertrain(lr=0.0001,decay_iterations=100_000,decay_ratio = 2,episodes=6000)
     play(filename='model.pth')
