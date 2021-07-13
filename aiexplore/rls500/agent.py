@@ -20,8 +20,8 @@ LR = 0.0002
 # full hinting.
 LR = 0.00001
 # full hinting after 1590 runs it got to 1.6350799082655783e-06 Nd rN out of episodes
-LR = 0.0000016
-LR = 0.00000085
+#LR = 0.0000016
+#LR = 0.00000085
 #LR=3.95e-7
 #LR=3.2e-7
 #LR=2.46e-7
@@ -32,8 +32,9 @@ LR = 0.00000085
 #LR=2.82e-8
 #LR=2e-8
 #LR=1e-8
-LR=5e-9
-
+#LR=5e-9
+#SCD
+LR = 0.00002
 onehot_action = { 
     (1,0,0,0,0): Action.A_UP,
     (0,1,0,0,0): Action.A_DOWN,
@@ -70,7 +71,7 @@ class Agent:
 
     # decay ratio of 1.65 for full random
     # decay ratio of 1.05 for full hint.
-    def __init__(self,lr=LR,filename='model.pth',decay_iterations=50_000, decay_ratio = 1.1):
+    def __init__(self,lr=LR,filename='model.pth',decay_iterations=35_000, decay_ratio = 1.15):
         self.n_games = 0
         self.epsilon = 240 # randomness
         self.epsilon_max = 2
@@ -80,7 +81,7 @@ class Agent:
         self.memory = deque(maxlen=MAX_MEMORY)
         self.hint_memory = deque(maxlen=MAX_MEMORY)
         self.synthetic_memory = deque(maxlen=SYNTHETIC_MAX_MEMORY)
-        self.synthetic_data()
+        #self.synthetic_data()
         self.model = None
   
         file_name = os.path.join('./model', filename)
@@ -88,7 +89,7 @@ class Agent:
             self.model = torch.load(file_name)
             print("loaded")
         else:
-            self.model = Linear_QNet(len(state_info), 5, len(onehot_action)) # first parm is the lenght of the state array 
+            self.model = Linear_QNet(len(state_info), 16, len(onehot_action)) # first parm is the lenght of the state array 
         for param_tensor in self.model.state_dict():
             print(param_tensor, "\t", self.model.state_dict()[param_tensor].size())
             print(param_tensor, "\t", self.model.state_dict()[param_tensor])
@@ -279,7 +280,11 @@ def train():
     agent = Agent(lr=LR)
     game = BallisticGameAI()
     game_reward = 0
-    episode = 1_000_000
+    episode = 3_000_000
+
+
+
+
     while episode > 0:
         episode -= 1
         hint = False
@@ -337,13 +342,13 @@ def train():
                 record = score
                 agent.model.save()
 
-            print('Game', agent.n_games, 'Score', score, 'Record:', record, "Game_Reward: ", game_reward, " Mem: ", len(agent.memory)," lr ",agent.trainer.lr, " Episode ", episode)
+            #print('Game', agent.n_games, 'Score', score, 'Record:', record, "Game_Reward: ", game_reward, " Mem: ", len(agent.memory)," lr ",agent.trainer.lr, " Episode ", episode)
             game_reward = 0
             plot_scores.append(score)
             total_score += score
             mean_score = total_score / agent.n_games
             plot_mean_scores.append(mean_score)
-            plot(plot_scores, plot_mean_scores,'Training')
+            _=plot(plot_scores, plot_mean_scores,'Training')
 
 def supertrain(lr=LR,decay_iterations = 100_000,decay_ratio = 1.1, episodes=6000):
     plot_scores = []

@@ -50,7 +50,7 @@ class Agent:
             self.model = torch.load(file_name)
             print("loaded")
         else:
-            self.model = Linear_QNet(len(state_info), 5, len(onehot_action)) # first parm is the lenght of the state array 
+            self.model = Linear_QNet(len(state_info), 16, len(onehot_action)) # first parm is the lenght of the state array 
         for param_tensor in self.model.state_dict():
             print(param_tensor, "\t", self.model.state_dict()[param_tensor].size())
             print(param_tensor, "\t", self.model.state_dict()[param_tensor])

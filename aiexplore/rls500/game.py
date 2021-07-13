@@ -42,7 +42,7 @@ ANGLE_UP = ANGLE_UP_SMALL*10
 ANGLE_DOWN = ANGLE_UP + 0.00001
 ANGLE_DOWN_SMALL = ANGLE_UP_SMALL - 0.00001
 
-ANGLE_FIRE_WOBBLE = ANGLE_UP_SMALL*1/3
+ANGLE_FIRE_WOBBLE = ANGLE_UP_SMALL*1.1
 
 HIT_REWARD = 900
 MOVE_PENALTY = -10
@@ -73,7 +73,7 @@ class BallisticGameAI:
 
     def reset(self):
         # init game state
-        print("previous: iterations",self.frame_iteration," shots: ", self.shots )
+        #print("previous: iterations",self.frame_iteration," shots: ", self.shots )
         self.score = 0
         self.frame_iteration = 0
         self.missile_loc = Point(1,1)
@@ -289,7 +289,7 @@ class BallisticGameAI:
 
     def find_missile(self):
 
-        self.missile_loc = Point(random.randint(self.w-1120, self.w-60),
+        self.missile_loc = Point(random.randint(self.w-1130, self.w-30),
                                 random.randint(self.h-900, self.h-50)) 
         ay = self.aabattery.y-2-(self.missile_loc.y+self.missile_size//2)
         ax = (self.missile_loc.x+self.missile_size//2)-self.aabattery.x+10
@@ -300,7 +300,7 @@ class BallisticGameAI:
     
     def hint(self):
         angle = round(self.angle-self.missile_alpha,3)
-        if angle < ANGLE_DOWN_SMALL*0.95 and angle > -ANGLE_UP_SMALL*0.95:
+        if angle < ANGLE_DOWN_SMALL and angle > -ANGLE_UP_SMALL:
             return Action.FIRE
 
         if angle > ANGLE_DOWN:
