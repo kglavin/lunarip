@@ -8,14 +8,31 @@ from model import Linear_QNet, QTrainer
 from helper import plot
 import os
 import math
+import time
 
 #derived from https://github.com/python-engineer/snake-ai-pytorch
 
 MAX_MEMORY = 100_000
 SYNTHETIC_MAX_MEMORY = 3_000_000
 BATCH_SIZE = 1000
+# random learning value with no hinting
 LR = 0.0002
-#LR = 0.002
+# full hinting.
+LR = 0.00001
+# full hinting after 1590 runs it got to 1.6350799082655783e-06 Nd rN out of episodes
+LR = 0.0000016
+LR = 0.00000085
+#LR=3.95e-7
+#LR=3.2e-7
+#LR=2.46e-7
+#LR=2e-07
+#LR=1e-07
+#LR=5e-08
+#LR=3.75e-08
+#LR=2.82e-8
+#LR=2e-8
+#LR=1e-8
+LR=5e-9
 
 onehot_action = { 
     (1,0,0,0,0): Action.A_UP,
@@ -51,7 +68,9 @@ state_info = [
 
 class Agent:
 
-    def __init__(self,lr=LR,filename='model.pth',decay_iterations=50_000, decay_ratio = 1.65):
+    # decay ratio of 1.65 for full random
+    # decay ratio of 1.05 for full hint.
+    def __init__(self,lr=LR,filename='model.pth',decay_iterations=50_000, decay_ratio = 1.1):
         self.n_games = 0
         self.epsilon = 240 # randomness
         self.epsilon_max = 2
@@ -270,7 +289,7 @@ def train():
         # get move
         
         # when enabled, gets a hint from the game, to speed up finding good moves.
-        if random.randint(0,5) == 1: # disabled
+        if random.randint(0,5) <10: # disabled
             final_move = action_onehot[agent._app_specific_hint(game)]
             hint = True
         else:
@@ -393,3 +412,4 @@ if __name__ == '__main__':
     #train()
     #supertrain(lr=0.0001,decay_iterations=100_000,decay_ratio = 2,episodes=6000)
     play(speed=60,filename='model.pth')
+ 
