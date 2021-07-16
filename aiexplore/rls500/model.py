@@ -68,7 +68,7 @@ class QTrainer:
         self.iterations = 0
 
     def train_step(self, state, action, reward, next_state, done):
-        BATCH_SIZE = 1000  # from agent.py
+        BATCH_SIZE = 1  # from agent.py
         self.iterations += 1
         if self.iterations*BATCH_SIZE > self.decay_iterations:
             self.iterations = 0
@@ -76,8 +76,8 @@ class QTrainer:
             #self.decay_iterations = self.decay_iterations * self.decay_ratio
             self.decay_iterations = self.decay_iterations + (BATCH_SIZE * self.decay_steps) * self.iter_growth_val
             self.decay_steps += 1
-            if self.decay_iterations > 500000: #was 500K
-                self.decay_iterations = 500000
+            if self.decay_iterations >60000: #was 500K
+                self.decay_iterations = 60000
             #print("dropping learning rate ",self.lr,self.lr/self.decay_ratio)
             #self.lr = self.lr / self.decay_ratio
             #self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
@@ -89,8 +89,9 @@ class QTrainer:
             print(self.scheduler.state_dict())
             print(" ************************************ Scheduler.step() COMPLETE *********************", )
         else:
-            if self.iterations % 2 == 0:
+            if self.iterations % 100000 == 0:
                 print("Iteration ",self.iterations, " Batch_iteration ", self.iterations*BATCH_SIZE, " of Decay Iterations ", self.decay_iterations)
+                
             
         state = torch.tensor(state, dtype=torch.float32)
         next_state = torch.tensor(next_state, dtype=torch.float32)

@@ -42,7 +42,7 @@ ANGLE_UP = ANGLE_UP_SMALL*10
 ANGLE_DOWN = ANGLE_UP + 0.00001
 ANGLE_DOWN_SMALL = ANGLE_UP_SMALL - 0.00001
 
-ANGLE_FIRE_WOBBLE = ANGLE_UP_SMALL*1.1
+ANGLE_FIRE_WOBBLE = ANGLE_UP_SMALL*0.51
 
 HIT_REWARD = 900
 MOVE_PENALTY = -10
@@ -130,7 +130,8 @@ class BallisticGameAI:
         if self.shotfired == True:
             r,missile_hit = self._shot_fired_reward(action)
             reward += r
-            self.angle += random.choice([2*-ANGLE_FIRE_WOBBLE,-ANGLE_FIRE_WOBBLE,ANGLE_FIRE_WOBBLE,2*ANGLE_FIRE_WOBBLE])
+            #self.angle += random.choice([2*-ANGLE_FIRE_WOBBLE,-ANGLE_FIRE_WOBBLE,ANGLE_FIRE_WOBBLE,2*ANGLE_FIRE_WOBBLE])
+            self.angle += random.choice([-ANGLE_FIRE_WOBBLE,ANGLE_FIRE_WOBBLE])
 
         #update ui and clock
         if self.want_ui > 0:
@@ -156,7 +157,7 @@ class BallisticGameAI:
                                                             self.missile_loc.y+self.missile_size//2,
                                                             2,2))
 
-        # aiming hint
+        # aiming sight for visual inspection
         x,y =  trajectory.trajectory(4,self.angle,self.velocity,self.dt*10)
         if len(x) > 0:
             for i in range(len(x)):
@@ -305,16 +306,16 @@ class BallisticGameAI:
         if angle < ANGLE_DOWN_SMALL and angle > -ANGLE_UP_SMALL:
             return Action.FIRE
 
-        if angle > ANGLE_DOWN:
+        if angle >= ANGLE_DOWN:
             return Action.A_DOWN_LARGE
         
-        if angle < ANGLE_DOWN and angle > ANGLE_DOWN_SMALL:
+        if angle <= ANGLE_DOWN and angle > ANGLE_DOWN_SMALL:
             return Action.A_DOWN  
 
-        if angle < -(ANGLE_UP):
+        if angle <= -(ANGLE_UP):
             return Action.A_UP_LARGE 
 
-        if angle < -ANGLE_UP_SMALL:
+        if angle <= -ANGLE_UP_SMALL:
             return Action.A_UP    
 
         return random.choice([Action.A_UP, Action.A_DOWN, Action.FIRE])

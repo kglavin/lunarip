@@ -75,7 +75,7 @@ state_info = [
 class Agent:
     # decay ratio of 1.65 for full random
     # decay ratio of 1.05 for full hint.
-    def __init__(self,lr=LR,filename='model.pth',decay_iterations=30_000, iter_growth_val = 1.07,ogamma=0.65): #was running at 0.7 
+    def __init__(self,lr=LR,filename='model.pth',decay_iterations=50_000, iter_growth_val = 1.07,ogamma=0.65): #was running at 0.7 
         self.n_games = 0
         self.epsilon = 240 # randomness
         self.epsilon_max = 2
@@ -86,7 +86,7 @@ class Agent:
         self.memory = deque(maxlen=MAX_MEMORY)
         self.hint_memory = deque(maxlen=MAX_MEMORY)
         self.synthetic_memory = deque(maxlen=SYNTHETIC_MAX_MEMORY)
-        self.synthetic_data()
+        #self.synthetic_data()
         self.model = None
   
         file_name = os.path.join('./model', filename)
@@ -366,12 +366,12 @@ class Agent:
 
     def model_describe_print(self,episode):
             cols = self.model_describe() 
-            print("\033[F")
-            print("\033[F")
+            #print("\033[F")
+            #print("\033[F")
 
-            for a,b in cols:
-                print("\033[F")
-            print(episode," #######################################################################################")
+            #for a,b in cols:
+            #    print("\033[F")
+            print(self.n_games,episode," ###############################################################")
             for i,col in cols:
                 print(i,"\t",col)
             print("#######################################################################################")
@@ -379,18 +379,18 @@ class Agent:
     def save(self,filename):
             self.trainer.save(filename)
 
-def train():
+def train(lr=0.0001, episodes=300_000_000,ogamma=0.7):
     plot_scores = []
     plot_mean_scores = []
     total_score = 0
     total_reward = 0
     record = 0
-    agent = Agent(lr=LR,decay_iterations=20_000)
+    agent = Agent(lr=lr,decay_iterations=40_000,ogamma=ogamma)
     game = BallisticGameAI()
     game_reward = 0
-    episode = 3_000_000
-    while episode > 0:
-        episode -= 1
+    episode = 0
+    while episode < episodes:
+        episode += 1
         hint = False
         # get old state
         state_old = agent.get_state(game)
@@ -398,7 +398,7 @@ def train():
         # get move
         
         # when enabled, gets a hint from the game, to speed up finding good moves.
-        if random.randint(0,5) <10: # disabled
+        if random.randint(0,8) == 1: # disabled
             final_move = action_onehot[agent._app_specific_hint(game)]
             hint = True
         else:
@@ -443,10 +443,11 @@ def train():
 
 
             total_reward += game_reward
-            if score >= record:
+            if score >= record or (agent.n_games %100) == 1:
                 record = score
-                agent.model.save()
-                agent.model_describe()
+                agent.save(filename='model.pth.'+ str(episode))
+                #agent.model_describe()
+            agent.model_describe_print(episode)
 
             #print('Game', agent.n_games, 'Score', score, 'Record:', record, "Game_Reward: ", game_reward, " Mem: ", len(agent.memory)," lr ",agent.trainer.lr, " Episode ", episode)
             game_reward = 0
@@ -463,6 +464,7 @@ def supertrain(lr=0.001, episodes=30000,decay_iterations=70_000, iter_growth_val
     total_reward = 0
     record = 0
     agent = Agent(lr,decay_iterations=decay_iterations, iter_growth_val=iter_growth_val,ogamma=ogamma)
+    agent.synthetic_data()
     game = BallisticGameAI()
     game_reward = 0
     episode = 1
@@ -525,7 +527,7 @@ def play(speed=4,filename='model.pth'):
             plot(plot_scores, plot_mean_scores,'Playing')
 
 if __name__ == '__main__':
-    #train()
-    supertrain()
+    train(lr=0.0002,ogamma=0.67)
+    #supertrain()
     #play(speed=60,filename='model.pth')
  
