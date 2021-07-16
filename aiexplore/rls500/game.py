@@ -291,6 +291,8 @@ class BallisticGameAI:
 
         self.missile_loc = Point(random.randint(self.w-1130, self.w-30),
                                 random.randint(self.h-900, self.h-50)) 
+        #self.missile_loc = Point(random.randint(self.w-900, self.w-30),
+        #                        random.randint(self.h-900, self.h-200)) 
         ay = self.aabattery.y-2-(self.missile_loc.y+self.missile_size//2)
         ax = (self.missile_loc.x+self.missile_size//2)-self.aabattery.x+10
         self.missile_alpha = math.atan(ay/ax)

@@ -9,11 +9,14 @@ from helper import plot
 import os
 import math
 import time
+from termcolor import colored
+import json
+
 
 #derived from https://github.com/python-engineer/snake-ai-pytorch
 
 MAX_MEMORY = 100_000
-SYNTHETIC_MAX_MEMORY = 3_000_000
+SYNTHETIC_MAX_MEMORY = 4_000_000
 BATCH_SIZE = 1000
 # random learning value with no hinting
 LR = 0.0002
@@ -34,7 +37,9 @@ LR = 0.00001
 #LR=1e-8
 #LR=5e-9
 #SCD
-LR = 0.00002
+LR = 0.001
+
+
 onehot_action = { 
     (1,0,0,0,0): Action.A_UP,
     (0,1,0,0,0): Action.A_DOWN,
@@ -68,20 +73,20 @@ state_info = [
             ]
 
 class Agent:
-
     # decay ratio of 1.65 for full random
     # decay ratio of 1.05 for full hint.
-    def __init__(self,lr=LR,filename='model.pth',decay_iterations=35_000, decay_ratio = 1.15):
+    def __init__(self,lr=LR,filename='model.pth',decay_iterations=30_000, iter_growth_val = 1.07,ogamma=0.65): #was running at 0.7 
         self.n_games = 0
         self.epsilon = 240 # randomness
         self.epsilon_max = 2
         self.gamma = 0.9 # discount rate
         self.decay_iterations = decay_iterations
-        self.decay_ratio = decay_ratio
+        self.iter_growth_val = iter_growth_val
+        self.ogamma = ogamma
         self.memory = deque(maxlen=MAX_MEMORY)
         self.hint_memory = deque(maxlen=MAX_MEMORY)
         self.synthetic_memory = deque(maxlen=SYNTHETIC_MAX_MEMORY)
-        #self.synthetic_data()
+        self.synthetic_data()
         self.model = None
   
         file_name = os.path.join('./model', filename)
@@ -94,7 +99,7 @@ class Agent:
             print(param_tensor, "\t", self.model.state_dict()[param_tensor].size())
             print(param_tensor, "\t", self.model.state_dict()[param_tensor])
 
-        self.trainer = QTrainer(self.model, lr=lr, gamma=self.gamma,decay_iterations=decay_iterations,decay_ratio=decay_ratio)
+        self.trainer = QTrainer(self.model, lr=lr, gamma=self.gamma,decay_iterations=decay_iterations,iter_growth_val=iter_growth_val,ogamma=ogamma)
 
 
 
@@ -105,7 +110,8 @@ class Agent:
         return np.array(state,dtype=float)
 
     def synthetic_data(self):
-        for r in range(1,1200,1):
+        for r in range(1,700,1):
+            #short range fire at -.012 to +0.012
             for a in range(0,120,1):
                 state = [round(a/1000,3), r]
                 action = action_onehot[Action.FIRE]
@@ -113,17 +119,15 @@ class Agent:
                 next_state = [round(a/1000,3), r]
                 done = False
                 self.synthetic_memory.append((state, action, reward, next_state, done))
-
-            #for a in range(0,120,1):
-            #    state = [round(a/1000,3), r]
-            #    action = action_onehot[random.choice([Action.A_DOWN_LARGE, Action.A_UP, Action.A_DOWN,Action.A_UP_LARGE])]
-            #    reward = -100
-            #    next_state = [round(a/1000,3), r]
-            #    done = False
-            #    self.synthetic_memory.append((state, action, reward, next_state, done))
-
-
-            for a in range(121,500,1):
+                state = [round(-a/1000,3), r]
+                action = action_onehot[Action.FIRE]
+                reward = 600
+                next_state = [round(-a/1000,3), r]
+                done = False
+                self.synthetic_memory.append((state, action, reward, next_state, done))
+            
+            
+            for a in range(121,519,1):
                 state = [round(a/1000,3), r]
                 action = action_onehot[Action.A_DOWN]
                 reward = 60
@@ -132,42 +136,61 @@ class Agent:
                 done = False
                 self.synthetic_memory.append((state, action, reward, next_state, done))
 
-
-            for a in range(121,500,1):
-                state = [round(-a/1000,3), r]
+            for a in range(-121,-519,-1):
+                state = [round(a/1000,3), r]
                 action = action_onehot[Action.A_UP]
                 reward = 60
-                a -= ANGLE_UP_SMALL
+                a += ANGLE_UP_SMALL
+                next_state = [round(a/1000,3), r]
+                done = False
+                self.synthetic_memory.append((state, action, reward, next_state, done))
+
+        for r in range(701,1200,1):
+            #longer range narrow down fire at -.0075 to +0.0075
+            for a in range(0,75,1):
+                state = [round(a/1000,3), r]
+                action = action_onehot[Action.FIRE]
+                reward = 600
+                next_state = [round(a/1000,3), r]
+                done = False
+                self.synthetic_memory.append((state, action, reward, next_state, done))
+                state = [round(-a/1000,3), r]
+                action = action_onehot[Action.FIRE]
+                reward = 600
                 next_state = [round(-a/1000,3), r]
                 done = False
                 self.synthetic_memory.append((state, action, reward, next_state, done))
-            
-            #for a in range(121,500,1):
-            #    state = [round(a/1000,3), r]
-            #    action = action_onehot[random.choice([Action.A_DOWN_LARGE, Action.A_UP, Action.FIRE,Action.A_UP_LARGE])]
-            #    reward = -20
-            #    next_state = [round(a/1000,3), r]
-            #    done = False
-            #    self.synthetic_memory.append((state, action, reward, next_state, done))
-            
-            #for a in range(121,500,1):
-            #    state = [round(-a/1000,3), r]
-            #    action = action_onehot[random.choice([Action.A_DOWN_LARGE, Action.A_DOWN, Action.FIRE,Action.A_UP_LARGE])]
-            #    reward = -20
-            #    next_state = [round(-a/1000,3), r]
-            #    done = False
-            #    self.synthetic_memory.append((state, action, reward, next_state, done))
 
-            for a in range(121,500,1):
-                state = [round(-a/1000,3), r]
+            for a in range(75,519,1):
+                state = [round(a/1000,3), r]
+                action = action_onehot[Action.A_DOWN]
+                reward = 60
+                a -= ANGLE_DOWN_SMALL
+                next_state = [round(a/1000,3), r]
+                done = False
+                self.synthetic_memory.append((state, action, reward, next_state, done))
+
+            for a in range(-75,-519,-1):
+                state = [round(a/1000,3), r]
+                action = action_onehot[Action.A_UP]
+                reward = 60
+                a += ANGLE_UP_SMALL
+                next_state = [round(a/1000,3), r]
+                done = False
+                self.synthetic_memory.append((state, action, reward, next_state, done))
+    
+        for r in range(1,1200,1):
+            # across all ranges, rapidally move to minimise angle 
+            for a in range(-520,-1572,-1):
+                state = [round(a/1000,3), r]
                 action = action_onehot[Action.A_UP_LARGE]
                 reward = 60
-                a -= ANGLE_UP
-                next_state = [round(-a/1000,3), r]
+                a += ANGLE_UP
+                next_state = [round(a/1000,3), r]
                 done = False
                 self.synthetic_memory.append((state, action, reward, next_state, done))
 
-            for a in range(520,1570,1):
+            for a in range(520,1572,1):
                 state = [round(a/1000,3), r]
                 action = action_onehot[Action.A_DOWN_LARGE]
                 reward = 60
@@ -175,34 +198,71 @@ class Agent:
                 next_state = [round(a/1000,3), r]
                 done = False
                 self.synthetic_memory.append((state, action, reward, next_state, done))
+
             
-            #for a in range(121,500,1):
-            #    state = [round(-a/1000,3), r]
-            #    action = action_onehot[random.choice([Action.A_DOWN_LARGE, Action.A_UP, Action.FIRE,Action.A_DOWN])]
-            #    reward = -20
-            #    next_state = [round(-a/1000,3), r]
-            #    done = False
-            #    self.synthetic_memory.append((state, action, reward, next_state, done))
-
-            #for a in range(520,1570,1):
-            #    state = [round(a/1000,3), r]
-            #    action = action_onehot[random.choice([Action.A_UP_LARGE, Action.A_UP, Action.FIRE,Action.A_DOWN])]
-            #    reward = -20
-            #    next_state = [round(a/1000,3), r]
-            #    done = False
-            #    self.synthetic_memory.append((state, action, reward, next_state, done))
+            # Negative rewards
+            doNegative = False
+            if doNegative == True:
+                for a in range(121,520,1):
+                    state = [round(a/1000,3), r]
+                    # want an A_DOWN but get....
+                    action = action_onehot[random.choice([Action.A_DOWN_LARGE, Action.A_UP, Action.FIRE,Action.A_UP_LARGE])]
+                    reward = -20
+                    next_state = [round(a/1000,3), r]
+                    done = False
+                    self.synthetic_memory.append((state, action, reward, next_state, done))
             
+            
+                for a in range(-520,-1572,-1):
+                    state = [round(a/1000,3), r]
+                    # want an A_UP_LARGE but get....
+                    action = action_onehot[random.choice([Action.A_DOWN_LARGE, Action.A_DOWN, Action.FIRE,Action.A_UP])]
+                    reward = -20
+                    next_state = [round(a/1000,3), r]
+                    done = False
+                    self.synthetic_memory.append((state, action, reward, next_state, done))   
+
+                for a in range(520,1572,1):
+                    state = [round(a/1000,3), r]
+                    # want an A_DOWN_LARGE but get....
+                    action = action_onehot[random.choice([Action.FIRE, Action.A_UP, Action.A_DOWN,Action.A_UP_LARGE])]
+                    reward = -20
+                    next_state = [round(a/1000,3), r]
+                    done = False
+                    self.synthetic_memory.append((state, action, reward, next_state, done))
 
 
-    def synthetic_train(self):
-        if len(self.synthetic_memory) > 0:
-            for c in range(1,3):
-                if len(self.synthetic_memory) > BATCH_SIZE//100:
-                    mini_sample = random.sample(self.synthetic_memory, BATCH_SIZE//100)
-                else:
-                    mini_sample = random.sample(self.synthetic_memory, len(self.synthetic_memory))
-                states, actions, rewards, next_states, dones = zip(*mini_sample)
-                self.trainer.train_step(states, actions, rewards, next_states, dones)
+                for a in range(-121,-520,-1):
+                    state = [round(a/1000,3), r]
+                    # want an A_UP but get....
+                    action = action_onehot[random.choice([Action.A_DOWN_LARGE, Action.A_UP_LARGE, Action.FIRE,Action.A_DOWN])]
+                    reward = -20
+                    next_state = [round(a/1000,3), r]
+                    done = False
+                    self.synthetic_memory.append((state, action, reward, next_state, done))
+
+                for a in range(121,520,1):
+                    state = [round(a/1000,3), r]
+                    # want an A_DOWN but get....
+                    action = action_onehot[random.choice([Action.A_UP_LARGE, Action.A_UP, Action.FIRE,Action.A_DOWN_LARGE])]
+                    reward = -20
+                    next_state = [round(a/1000,3), r]
+                    done = False
+                    self.synthetic_memory.append((state, action, reward, next_state, done))
+
+                for a in range(0,120,1):
+                    state = [round(a/1000,3), r]
+                    action = action_onehot[random.choice([Action.A_UP_LARGE, Action.A_UP, Action.A_DOWN,Action.A_DOWN_LARGE])]
+                    reward = -20
+                    next_state = [round(a/1000,3), r]
+                    done = False
+                    self.synthetic_memory.append((state, action, reward, next_state, done))
+                    state = [round(-a/1000,3), r]
+                    action = action_onehot[random.choice([Action.A_UP_LARGE, Action.A_UP, Action.A_DOWN,Action.A_DOWN_LARGE])]
+                    reward = -20
+                    next_state = [round(-a/1000,3), r]
+                    done = False
+                    self.synthetic_memory.append((state, action, reward, next_state, done))
 
 
     def remember(self, state, action, reward, next_state, done):
@@ -211,7 +271,7 @@ class Agent:
     def hint_remember(self, state, action, reward, next_state, done):
         self.hint_memory.append((state, action, reward, next_state, done)) 
 
-    def train_long_memory_with_synthetic(self):
+    def train_long_memory_with_synthetic(self,discount=0.01):
         ## add in a set of synthetic data into the memory
         if len(self.synthetic_memory) > BATCH_SIZE:
             mini_sample = random.sample(self.synthetic_memory, BATCH_SIZE)
@@ -221,14 +281,14 @@ class Agent:
         for idx in range(len(mini_sample)):
             state, action, reward, next_state, done = mini_sample[idx]
             if (action == action_onehot[Action.FIRE]) and (reward > 0):
-                next_state = [round(random.randint(0,15708)/10000,3),
+                next_state = [round(random.randint(0,1572)/10000,3),
                                     random.randint(10,1200)]
                 mini_sample[idx] = (state, action, reward, next_state, done)
         states, actions, rewards, next_states, dones = zip(*mini_sample)
 
-        print(f'training with ({states[0]}, {actions[0]})({states[1]}, {actions[1]})({states[2]}, {actions[2]})')
+        #print(f'training with len({len(dones)}) {states[0]}, {actions[0]})({states[1]}, {actions[1]})({states[2]}, {actions[2]})')
         self.trainer.train_step(states, actions, rewards, next_states, dones)
-        print("learning rate ",self.trainer.lr," ",self.trainer.decay_ratio," ",self.trainer.iterations)
+        #print("learning rate ",self.trainer.lr," ",self.trainer.decay_ratio," ",self.trainer.iterations)
 
 
     def train_long_memory(self):
@@ -267,9 +327,57 @@ class Agent:
             prediction = self.model(state0)
             move = int(torch.argmax(prediction).item())
             final_move = int_onehot[move]
-
         return final_move
 
+    def get_model_action(self, state):
+        state0 = torch.tensor(state, dtype=torch.float32)
+        prediction = self.model(state0)
+        move = int(torch.argmax(prediction).item())
+        final_move = int_onehot[move]
+        action = onehot_action[tuple(final_move)]
+        #print(move,final_move,action)
+        return action
+
+    def model_describe(self):
+        cols = []
+        for i in [ math.pi/2, math.pi/3,math.pi/4, math.pi/6, math.pi/8,math.pi/12, math.pi/16,math.pi/32, math.pi/64,math.pi/128, math.pi/256, math.pi/512, 
+                0, 
+                -math.pi/512,-math.pi/256,-math.pi/128, -math.pi/64, -math.pi/32,-math.pi/16,-math.pi/12, -math.pi/8, -math.pi/6,-math.pi/4,  -math.pi/3,-math.pi/2]:
+            a = []
+            col = ""
+            for r in [50,100,200,300,400,500,600,700,900,1000,1100,1200]:
+                action = self.get_model_action([round(i,3), r])
+                a.append((action,[round(i,3),r]))
+            for t in a:
+                action, state = t
+                if action == Action.A_DOWN_LARGE:
+                    col = col + colored('{:10s}','blue',attrs=['reverse']).format(str(state))
+                if action == Action.A_DOWN:
+                    col = col + colored('{:10s}','blue').format(str(state))
+                if action == Action.FIRE:
+                    col = col + colored('{:10s}','red').format(str(state))
+                if action == Action.A_UP_LARGE:
+                    col = col + colored('{:10s}','green',attrs=['reverse']).format(str(state))
+                if action == Action.A_UP:
+                    col = col + colored('{:10s}','green').format(str(state))
+            cols.append(('{:6s}'.format(str(round(i,3))),col))
+
+        return cols
+
+    def model_describe_print(self,episode):
+            cols = self.model_describe() 
+            print("\033[F")
+            print("\033[F")
+
+            for a,b in cols:
+                print("\033[F")
+            print(episode," #######################################################################################")
+            for i,col in cols:
+                print(i,"\t",col)
+            print("#######################################################################################")
+
+    def save(self,filename):
+            self.trainer.save(filename)
 
 def train():
     plot_scores = []
@@ -277,14 +385,10 @@ def train():
     total_score = 0
     total_reward = 0
     record = 0
-    agent = Agent(lr=LR)
+    agent = Agent(lr=LR,decay_iterations=20_000)
     game = BallisticGameAI()
     game_reward = 0
     episode = 3_000_000
-
-
-
-
     while episode > 0:
         episode -= 1
         hint = False
@@ -323,7 +427,8 @@ def train():
             hint = False
 
         if game.want_save == True:
-            agent.model.save()
+            #agent.model.save()
+            agent.save()
             game.want_save = False
 
         if done:
@@ -341,6 +446,7 @@ def train():
             if score >= record:
                 record = score
                 agent.model.save()
+                agent.model_describe()
 
             #print('Game', agent.n_games, 'Score', score, 'Record:', record, "Game_Reward: ", game_reward, " Mem: ", len(agent.memory)," lr ",agent.trainer.lr, " Episode ", episode)
             game_reward = 0
@@ -350,29 +456,34 @@ def train():
             plot_mean_scores.append(mean_score)
             _=plot(plot_scores, plot_mean_scores,'Training')
 
-def supertrain(lr=LR,decay_iterations = 100_000,decay_ratio = 1.1, episodes=6000):
+def supertrain(lr=0.001, episodes=30000,decay_iterations=70_000, iter_growth_val=1.12,ogamma=0.7):
     plot_scores = []
     plot_mean_scores = []
     total_score = 0
     total_reward = 0
     record = 0
-    agent = Agent(lr,decay_iterations=decay_iterations,decay_ratio=decay_ratio)
+    agent = Agent(lr,decay_iterations=decay_iterations, iter_growth_val=iter_growth_val,ogamma=ogamma)
     game = BallisticGameAI()
     game_reward = 0
-    episode = 0
+    episode = 1
     while episode < episodes:
         episode += 1
-        print("Training episode: ",episode)
+        #print("Training episode: ",episode)
         agent.train_long_memory_with_synthetic()
-        if (episode % 50) == 0:
-            agent.model.save(file_name='model.pth.'+ str(episode))
-
+        if (episode % (decay_iterations/BATCH_SIZE)) == 0:
+            agent.save(filename='model.'+ str(episode))
+            #agent.model.save(file_name='model.pth.'+ str(episode))
+            #agent.model_describe()
+        if (episode % 2) == 0:
+            agent.model_describe_print(episode) 
     agent.model.save(file_name='model.pth.'+ str(episode))
+    agent.model_describe_print(episode)
 
 def play(speed=4,filename='model.pth'):
     plot_scores = []
     plot_mean_scores = []
     total_score = 0
+
     record = 0
     agent = Agent(filename=filename)
     game = BallisticGameAI(speed=speed)
@@ -415,6 +526,6 @@ def play(speed=4,filename='model.pth'):
 
 if __name__ == '__main__':
     #train()
-    #supertrain(lr=0.0001,decay_iterations=100_000,decay_ratio = 2,episodes=6000)
-    play(speed=60,filename='model.pth')
+    supertrain()
+    #play(speed=60,filename='model.pth')
  
