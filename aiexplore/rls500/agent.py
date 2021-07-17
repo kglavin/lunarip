@@ -15,7 +15,7 @@ import json
 
 #derived from https://github.com/python-engineer/snake-ai-pytorch
 
-MAX_MEMORY = 100_000
+MAX_MEMORY = 200_000
 SYNTHETIC_MAX_MEMORY = 4_000_000
 BATCH_SIZE = 1000
 # random learning value with no hinting
@@ -108,6 +108,47 @@ class Agent:
         #return np.array(state, dtype=float)
         state = [angle,game.missile_range]
         return np.array(state,dtype=float)
+
+    def add_fire_data(self,number=10):
+        if number < len(self.synthetic_memory):
+            for r in range(1,700,1):
+                #short range fire at -.012 to +0.012
+                for a in range(0,120,1):
+                    state = [round(a/1000,3), r]
+                    action = action_onehot[Action.FIRE]
+                    reward = 600
+                    next_state = [round(a/1000,3), r]
+                    done = False
+                    self.synthetic_memory.append((state, action, reward, next_state, done))
+                    state = [round(-a/1000,3), r]
+                    action = action_onehot[Action.FIRE]
+                    reward = 600
+                    next_state = [round(a/1000,3), r]
+                    done = False
+                    self.synthetic_memory.append((state, action, reward, next_state, done))
+            
+            for r in range(701,1200,1):
+                #longer range narrow down fire at -.0075 to +0.0075
+                for a in range(0,75,1):
+                    state = [round(a/1000,3), r]
+                    action = action_onehot[Action.FIRE]
+                    reward = 600
+                    next_state = [round(a/1000,3), r]
+                    done = False
+                    firedata.append((state, action, reward, next_state, done))
+                    state = [round(-a/1000,3), r]
+                    action = action_onehot[Action.FIRE]
+                    reward = 600
+                    next_state = [round(-a/1000,3), r]
+                    done = False
+                    self.synthetic_memory.append((state, action, reward, next_state, done))
+
+        if number > len(self.synthetic_memory):
+            number = len(self.synthetic_memory)
+
+        for s in random.choices(self.synthetic_memory,k=number):
+            self.memory.append(s)
+
 
     def synthetic_data(self):
         for r in range(1,700,1):
@@ -317,8 +358,9 @@ class Agent:
         return game.hint()
 
     def get_action(self, state):
-        if (self.n_games % 10) == 0:
-            self.epsilon_max += 1
+        if (self.n_games > 100):
+                self.epsilon_max += 1
+            
         if random.randint(0, self.epsilon_max) < self.epsilon:
             move = random.choice(action_list)
             final_move = action_onehot[move]
@@ -365,13 +407,14 @@ class Agent:
         return cols
 
     def model_describe_print(self,episode):
+            training = self.trainer.scheduler.state_dict()
             cols = self.model_describe() 
             #print("\033[F")
             #print("\033[F")
 
             #for a,b in cols:
             #    print("\033[F")
-            print(self.n_games,episode," ###############################################################")
+            print(self.n_games,episode,training['_last_lr']," ###############################################################")
             for i,col in cols:
                 print(i,"\t",col)
             print("#######################################################################################")
@@ -398,7 +441,10 @@ def train(lr=0.0001, episodes=300_000_000,ogamma=0.7):
         # get move
         
         # when enabled, gets a hint from the game, to speed up finding good moves.
-        if random.randint(0,8) == 1: # disabled
+        max_rnd = 2
+        if (episode % 20) == 1:
+            max_rnd +=1
+        if random.randint(0,max_rnd) == 1: 
             final_move = action_onehot[agent._app_specific_hint(game)]
             hint = True
         else:
@@ -428,14 +474,23 @@ def train(lr=0.0001, episodes=300_000_000,ogamma=0.7):
 
         if game.want_save == True:
             #agent.model.save()
-            agent.save()
+            agent.save(filename='model')
             game.want_save = False
 
         if done:
             # train long memory, plot result
             game.reset()
             agent.n_games += 1
+
             #if agent.n_games % 2 == 0:
+            #firedata = agent.n_games
+            if agent.n_games > 100:
+                if firedata < 600:
+                    firedata += 1
+            else:
+                firedata = 0
+            print("Adding fire data: ", firedata)
+            agent.add_fire_data(number=firedata)
             agent.train_long_memory()
             #else:
             #    agent.train_long_memory_with_synthetic()
@@ -506,10 +561,10 @@ def play(speed=4,filename='model.pth'):
         if missile_hit == True:
             game.find_missile()
             game.update_ui()
-            print("missile destroyed")
+            #print("missile destroyed")
 
 
-        print("s: ",state[0],state[1],  " action: ", action, " ns: ", state_new[0])
+        #print("s: ",state[0],state[1],  " action: ", action, " ns: ", state_new[0])
         if done:
             print("--------------------------------------------------------")
             game.reset()
@@ -527,7 +582,7 @@ def play(speed=4,filename='model.pth'):
             plot(plot_scores, plot_mean_scores,'Playing')
 
 if __name__ == '__main__':
-    train(lr=0.0002,ogamma=0.67)
+    #train(lr=0.001,ogamma=0.67)
     #supertrain()
-    #play(speed=60,filename='model.pth')
+    play(speed=120,filename='model.pth')
  

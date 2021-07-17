@@ -18,7 +18,7 @@ blue = pygame.Color('blue')
 yellow = pygame.Color('yellow')
 
 width, height = 1200, 900
-missile_size = 50
+missile_size = 38
 incr_angle = 0.011  # radians   little more than 1 degree
 incr_angle_large = 0.1 # radians 11.4 degrees
 vertical_angle = math.pi/2
@@ -36,8 +36,8 @@ class Action(Enum):
     A_UP_LARGE = 3,
     A_DOWN_LARGE = 4
 
-ANGLE_UP_SMALL = math.pi/180
-ANGLE_UP = ANGLE_UP_SMALL*10
+ANGLE_UP_SMALL = math.pi/360
+ANGLE_UP = ANGLE_UP_SMALL*20
 
 ANGLE_DOWN = ANGLE_UP + 0.00001
 ANGLE_DOWN_SMALL = ANGLE_UP_SMALL - 0.00001
@@ -58,7 +58,7 @@ class BallisticGameAI:
         self.h = h
         self.speed = speed
         self.missile_size = missile_size
-        self.aabattery_loc = Point(100, self.h-10)
+        self.aabattery_loc = Point(20, self.h-10)
         self.aabattery =  pygame.Rect(self.aabattery_loc.x, self.aabattery_loc.y, 15, 18 )
         self.score = 0
         self.frame_iteration = 0
@@ -79,7 +79,7 @@ class BallisticGameAI:
         self.missile_loc = Point(1,1)
         self.missile_alpha = math.atan(self.h-self.missile_loc.y/self.missile_loc.x)
         self.missile_range = int(math.sqrt(self.missile_loc.y**2 + self.missile_loc.x**2))
-        self.aabattery_loc = Point(100, self.h-20)
+        #self.aabattery_loc = Point(1, self.h-20)
         self.aabattery =  pygame.Rect(self.aabattery_loc.x, self.aabattery_loc.y, 15, 18 )
         self.angle = random.randint(10,1500)/1000
         self.velocity = 600
@@ -296,6 +296,8 @@ class BallisticGameAI:
         #                        random.randint(self.h-900, self.h-200)) 
         ay = self.aabattery.y-2-(self.missile_loc.y+self.missile_size//2)
         ax = (self.missile_loc.x+self.missile_size//2)-self.aabattery.x+10
+        if ax == 0:
+            ax = 1
         self.missile_alpha = math.atan(ay/ax)
         self.missile_range = int(math.sqrt(ay**2 + ax**2))
         self.missile = pygame.Rect(self.missile_loc.x, self.missile_loc.y, self.missile_size, self.missile_size)

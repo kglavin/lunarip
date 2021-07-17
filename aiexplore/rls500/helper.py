@@ -19,3 +19,9 @@ def plot(scores, mean_scores, title):
     plt.text(len(mean_scores)-1, mean_scores[-1], str(mean_scores[-1]))
     _ = plt.show(block=False)
     plt.pause(.1)
+
+def dashboard(initial_config,learning_score, learning, playing_score):
+    display.clear_output(wait=True)
+    plt.clf()
+    plt.title(title)
+
