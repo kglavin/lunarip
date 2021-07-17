@@ -76,8 +76,8 @@ class QTrainer:
             #self.decay_iterations = self.decay_iterations * self.decay_ratio
             self.decay_iterations = self.decay_iterations + (BATCH_SIZE * self.decay_steps) * self.iter_growth_val
             self.decay_steps += 1
-            if self.decay_iterations >60000: #was 500K
-                self.decay_iterations = 60000
+            if self.decay_iterations >20000: #was 500K
+                self.decay_iterations = 20000
             #print("dropping learning rate ",self.lr,self.lr/self.decay_ratio)
             #self.lr = self.lr / self.decay_ratio
             #self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr)

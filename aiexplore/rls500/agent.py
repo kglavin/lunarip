@@ -113,7 +113,7 @@ class Agent:
         if number < len(self.synthetic_memory):
             for r in range(1,700,1):
                 #short range fire at -.012 to +0.012
-                for a in range(0,120,1):
+                for a in range(0,12,1):
                     state = [round(a/1000,3), r]
                     action = action_onehot[Action.FIRE]
                     reward = 600
@@ -128,8 +128,8 @@ class Agent:
                     self.synthetic_memory.append((state, action, reward, next_state, done))
             
             for r in range(701,1200,1):
-                #longer range narrow down fire at -.0075 to +0.0075
-                for a in range(0,75,1):
+                #longer range narrow down fire at -.006 to +0.006
+                for a in range(0,6,1):
                     state = [round(a/1000,3), r]
                     action = action_onehot[Action.FIRE]
                     reward = 600
@@ -142,6 +142,24 @@ class Agent:
                     next_state = [round(-a/1000,3), r]
                     done = False
                     self.synthetic_memory.append((state, action, reward, next_state, done))
+            for r in range(1,1200,1):
+                for a in range(7,500,1):
+                    state = [round(a/1000,3), r]
+                    action = action_onehot[Action.A_DOWN]
+                    reward = 60
+                    a -= ANGLE_DOWN_SMALL
+                    next_state = [round(a/1000,3), r]
+                    done = False
+                    self.synthetic_memory.append((state, action, reward, next_state, done))
+                for a in range(-7,-500,-1):
+                    state = [round(a/1000,3), r]
+                    action = action_onehot[Action.A_UP]
+                    reward = 60
+                    a += ANGLE_UP_SMALL
+                    next_state = [round(a/1000,3), r]
+                    done = False
+                    self.synthetic_memory.append((state, action, reward, next_state, done))
+    
 
         if number > len(self.synthetic_memory):
             number = len(self.synthetic_memory)
@@ -484,8 +502,10 @@ def train(lr=0.0001, episodes=300_000_000,ogamma=0.7):
 
             #if agent.n_games % 2 == 0:
             #firedata = agent.n_games
-            if agent.n_games > 100:
-                if firedata < 600:
+            if agent.n_games == 100:
+                firedata = 100
+            if agent.n_games >= 100:
+                if firedata < 750:
                     firedata += 1
             else:
                 firedata = 0
@@ -511,6 +531,7 @@ def train(lr=0.0001, episodes=300_000_000,ogamma=0.7):
             mean_score = total_score / agent.n_games
             plot_mean_scores.append(mean_score)
             _=plot(plot_scores, plot_mean_scores,'Training')
+    agent.save(filename='model.pth.'+ str(episode))
 
 def supertrain(lr=0.001, episodes=30000,decay_iterations=70_000, iter_growth_val=1.12,ogamma=0.7):
     plot_scores = []
@@ -582,7 +603,7 @@ def play(speed=4,filename='model.pth'):
             plot(plot_scores, plot_mean_scores,'Playing')
 
 if __name__ == '__main__':
-    #train(lr=0.001,ogamma=0.67)
+    #train(lr=0.001,episodes=600_000, ogamma=0.75)
     #supertrain()
     play(speed=120,filename='model.pth')
  

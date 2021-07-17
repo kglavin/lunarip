@@ -172,9 +172,15 @@ class BallisticGameAI:
             pygame.draw.rect(self.display, blue, bullet)
 
         # status line
-        status = "angle: " + "{:.3f}".format(self.angle) + " velocity: " + str(self.velocity) 
+        #status = "angle: " + "{:.3f}".format(self.angle) + " velocity: " + str(self.velocity) 
+        #status = status + " shots: " + str(self.shots) + " score: " + str(self.score) 
+        #status = status + " iteration: " + str(self.frame_iteration) + " (" + str(self.missile_size) +","+ "{:.3f}".format(self.missile_alpha)+","+str(self.missile_range)+")"
+        #status = status + " la: " + str(self.last_action)
+
+               # status line
+        status = "angle: " + "{:.3f}".format(self.angle-self.missile_alpha) + " velocity: " + str(self.velocity) +" Range: "+str(self.missile_range)
         status = status + " shots: " + str(self.shots) + " score: " + str(self.score) 
-        status = status + " iteration: " + str(self.frame_iteration) + " (" + str(self.missile_size) +","+ "{:.3f}".format(self.missile_alpha)+","+str(self.missile_range)+")"
+        status = status + " iteration: " + str(self.frame_iteration) + " (" + str(self.missile_size) +","+ "{:.3f}".format(self.missile_alpha)+")"
         status = status + " la: " + str(self.last_action)
 
         text = font.render(status, True, white)
@@ -290,14 +296,16 @@ class BallisticGameAI:
 
     def find_missile(self):
 
-        self.missile_loc = Point(random.randint(self.w-1130, self.w-30),
-                                random.randint(self.h-900, self.h-50)) 
+        #self.missile_loc = Point(random.randint(self.w-1130, self.w-30),
+        #                        random.randint(self.h-900, self.h-50)) 
+        self.missile_loc = Point(random.randint(self.w-1130, self.w-20),
+                                random.randint(self.h-900, self.h-30)) 
         #self.missile_loc = Point(random.randint(self.w-900, self.w-30),
         #                        random.randint(self.h-900, self.h-200)) 
         ay = self.aabattery.y-2-(self.missile_loc.y+self.missile_size//2)
         ax = (self.missile_loc.x+self.missile_size//2)-self.aabattery.x+10
         if ax == 0:
-            ax = 1
+            ax = 0.001
         self.missile_alpha = math.atan(ay/ax)
         self.missile_range = int(math.sqrt(ay**2 + ax**2))
         self.missile = pygame.Rect(self.missile_loc.x, self.missile_loc.y, self.missile_size, self.missile_size)
@@ -308,13 +316,13 @@ class BallisticGameAI:
         if angle < ANGLE_DOWN_SMALL and angle > -ANGLE_UP_SMALL:
             return Action.FIRE
 
-        if angle >= ANGLE_DOWN:
+        if angle >= 1.4 * ANGLE_DOWN :
             return Action.A_DOWN_LARGE
         
         if angle <= ANGLE_DOWN and angle > ANGLE_DOWN_SMALL:
             return Action.A_DOWN  
 
-        if angle <= -(ANGLE_UP):
+        if angle <= -(1.4 *ANGLE_UP):
             return Action.A_UP_LARGE 
 
         if angle <= -ANGLE_UP_SMALL:
