@@ -79,10 +79,11 @@ class BallisticGameAI:
         self.missile_loc = Point(1,1)
         self.missile_alpha = math.atan(self.h-self.missile_loc.y/self.missile_loc.x)
         self.missile_range = int(math.sqrt(self.missile_loc.y**2 + self.missile_loc.x**2))
+        self.missile_velocity = 600
         #self.aabattery_loc = Point(1, self.h-20)
         self.aabattery =  pygame.Rect(self.aabattery_loc.x, self.aabattery_loc.y, 15, 18 )
         self.angle = random.randint(10,1500)/1000
-        self.velocity = 600
+        #self.velocity = 600
         self.dt = 0.005
         self.shots = 300
         self.x = []
@@ -158,7 +159,7 @@ class BallisticGameAI:
                                                             2,2))
 
         # aiming sight for visual inspection
-        x,y =  trajectory.trajectory(4,self.angle,self.velocity,self.dt*10)
+        x,y =  trajectory.trajectory(4,self.angle,self.missile_velocity,self.dt*10)
         if len(x) > 0:
             for i in range(len(x)):
                 p = pygame.Rect(self.aabattery.x +10 +x[i],
@@ -172,13 +173,13 @@ class BallisticGameAI:
             pygame.draw.rect(self.display, blue, bullet)
 
         # status line
-        #status = "angle: " + "{:.3f}".format(self.angle) + " velocity: " + str(self.velocity) 
+        #status = "angle: " + "{:.3f}".format(self.angle) + " velocity: " + str(self.missile_velocity) 
         #status = status + " shots: " + str(self.shots) + " score: " + str(self.score) 
         #status = status + " iteration: " + str(self.frame_iteration) + " (" + str(self.missile_size) +","+ "{:.3f}".format(self.missile_alpha)+","+str(self.missile_range)+")"
         #status = status + " la: " + str(self.last_action)
 
                # status line
-        status = "angle: " + "{:.3f}".format(self.angle-self.missile_alpha) + " velocity: " + str(self.velocity) +" Range: "+str(self.missile_range)
+        status = "angle: " + "{:.3f}".format(self.angle-self.missile_alpha) + " velocity: " + str(self.missile_velocity) +" Range: "+str(self.missile_range)
         status = status + " shots: " + str(self.shots) + " score: " + str(self.score) 
         status = status + " iteration: " + str(self.frame_iteration) + " (" + str(self.missile_size) +","+ "{:.3f}".format(self.missile_alpha)+")"
         status = status + " la: " + str(self.last_action)
@@ -291,7 +292,7 @@ class BallisticGameAI:
 
             if action == Action.FIRE:
                     self.shotfired = True
-                    self.x,self.y =  trajectory.trajectory(1000,self.angle,self.velocity,self.dt)
+                    self.x,self.y =  trajectory.trajectory(1000,self.angle,self.missile_velocity,self.dt)
             return
 
     def find_missile(self):

@@ -71,19 +71,24 @@ class QTrainer:
         BATCH_SIZE = 1  # from agent.py
         self.iterations += 1
         if self.iterations*BATCH_SIZE > self.decay_iterations:
-            self.iterations = 0
-            self.decay_steps += 1
+            self.iterations = 0 
+            #self.decay_steps += 1
             #self.decay_iterations = self.decay_iterations * self.decay_ratio
             self.decay_iterations = self.decay_iterations + (BATCH_SIZE * self.decay_steps) * self.iter_growth_val
             self.decay_steps += 1
-            if self.decay_iterations >20000: #was 500K
-                self.decay_iterations = 20000
+            if self.decay_steps < 5:
+                if self.decay_iterations >20000: #was 500K
+                    self.decay_iterations = 20000
+            else:
+                scheduled_lr = self.scheduler.state_dict()['_last_lr']
+                self.decay_iterations = 20_000 + 0.01/float(scheduled_lr[0])
+                print("adding to exponential decay iteraions ",scheduled_lr,self.decay_iterations)
             #print("dropping learning rate ",self.lr,self.lr/self.decay_ratio)
             #self.lr = self.lr / self.decay_ratio
             #self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
             print(" ************************************ Scheduler.step() *****************************", )
-            print(self.scheduler.state_dict())
-            print(" ************************************")
+            #print(self.scheduler.state_dict())
+            #print(" ************************************")
             self.scheduler.step()
             print(" ************************************")
             print(self.scheduler.state_dict())
@@ -93,10 +98,10 @@ class QTrainer:
                 print("Iteration ",self.iterations, " Batch_iteration ", self.iterations*BATCH_SIZE, " of Decay Iterations ", self.decay_iterations)
                 
             
-        state = torch.tensor(state, dtype=torch.float32)
-        next_state = torch.tensor(next_state, dtype=torch.float32)
+        state = torch.tensor(state, dtype=torch.float)
+        next_state = torch.tensor(next_state, dtype=torch.float)
         action = torch.tensor(action, dtype=torch.int32)
-        reward = torch.tensor(reward, dtype=torch.float32)
+        reward = torch.tensor(reward, dtype=torch.float)
 
         if len(state.shape) == 1:
             state = torch.unsqueeze(state, 0)

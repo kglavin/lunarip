@@ -69,7 +69,8 @@ action_list = [Action.A_UP,Action.A_DOWN,Action.FIRE,Action.A_UP_LARGE,Action.A_
 
 state_info = [
             'angle',
-            'range'
+            'range',
+            'velocity',
             ]
 
 class Agent:
@@ -88,13 +89,14 @@ class Agent:
         self.synthetic_memory = deque(maxlen=SYNTHETIC_MAX_MEMORY)
         #self.synthetic_data()
         self.model = None
+        self.game = None
   
         file_name = os.path.join('./model', filename)
         if os.path.exists(file_name):
             self.model = torch.load(file_name)
             print("loaded")
         else:
-            self.model = Linear_QNet(len(state_info), 16, len(onehot_action)) # first parm is the lenght of the state array 
+            self.model = Linear_QNet(len(state_info), 32, len(onehot_action)) # first parm is the lenght of the state array 
         for param_tensor in self.model.state_dict():
             print(param_tensor, "\t", self.model.state_dict()[param_tensor].size())
             print(param_tensor, "\t", self.model.state_dict()[param_tensor])
@@ -106,7 +108,7 @@ class Agent:
     def get_state(self, game): 
         angle = round(game.angle-game.missile_alpha,3)
         #return np.array(state, dtype=float)
-        state = [angle,game.missile_range]
+        state = [angle,game.missile_range,game.missile_velocity]
         return np.array(state,dtype=float)
 
     def add_fire_data(self,number=10):
@@ -114,49 +116,49 @@ class Agent:
             for r in range(1,700,1):
                 #short range fire at -.012 to +0.012
                 for a in range(0,12,1):
-                    state = [round(a/1000,3), r]
+                    state = [round(a/1000,3), r,self.game.missile_velocity]
                     action = action_onehot[Action.FIRE]
                     reward = 600
-                    next_state = [round(a/1000,3), r]
+                    next_state = [round(a/1000,3), r,self.game.missile_velocity]
                     done = False
                     self.synthetic_memory.append((state, action, reward, next_state, done))
-                    state = [round(-a/1000,3), r]
+                    state = [round(-a/1000,3), r,self.game.missile_velocity]
                     action = action_onehot[Action.FIRE]
                     reward = 600
-                    next_state = [round(a/1000,3), r]
+                    next_state = [round(a/1000,3), r,self.game.missile_velocity]
                     done = False
                     self.synthetic_memory.append((state, action, reward, next_state, done))
             
-            for r in range(701,1200,1):
+            for r in range(701,1400,1):
                 #longer range narrow down fire at -.006 to +0.006
                 for a in range(0,6,1):
                     state = [round(a/1000,3), r]
                     action = action_onehot[Action.FIRE]
                     reward = 600
-                    next_state = [round(a/1000,3), r]
+                    next_state = [round(a/1000,3), r,self.game.missile_velocity]
                     done = False
                     firedata.append((state, action, reward, next_state, done))
-                    state = [round(-a/1000,3), r]
+                    state = [round(-a/1000,3), r,self.game.missile_velocity]
                     action = action_onehot[Action.FIRE]
                     reward = 600
-                    next_state = [round(-a/1000,3), r]
+                    next_state = [round(-a/1000,3), r,self.game.missile_velocity]
                     done = False
                     self.synthetic_memory.append((state, action, reward, next_state, done))
-            for r in range(1,1200,1):
+            for r in range(1,1400,1):
                 for a in range(7,500,1):
-                    state = [round(a/1000,3), r]
+                    state = [round(a/1000,3), r,self.game.missile_velocity]
                     action = action_onehot[Action.A_DOWN]
                     reward = 60
                     a -= ANGLE_DOWN_SMALL
-                    next_state = [round(a/1000,3), r]
+                    next_state = [round(a/1000,3), r,self.game.missile_velocity]
                     done = False
                     self.synthetic_memory.append((state, action, reward, next_state, done))
                 for a in range(-7,-500,-1):
-                    state = [round(a/1000,3), r]
+                    state = [round(a/1000,3), r,self.game.missile_velocity]
                     action = action_onehot[Action.A_UP]
                     reward = 60
                     a += ANGLE_UP_SMALL
-                    next_state = [round(a/1000,3), r]
+                    next_state = [round(a/1000,3), r,self.game.missile_velocity]
                     done = False
                     self.synthetic_memory.append((state, action, reward, next_state, done))
     
@@ -172,89 +174,89 @@ class Agent:
         for r in range(1,700,1):
             #short range fire at -.012 to +0.012
             for a in range(0,120,1):
-                state = [round(a/1000,3), r]
+                state = [round(a/1000,3), r,self.game.missile_velocity]
                 action = action_onehot[Action.FIRE]
                 reward = 600
-                next_state = [round(a/1000,3), r]
+                next_state = [round(a/1000,3), r,self.game.missile_velocity]
                 done = False
                 self.synthetic_memory.append((state, action, reward, next_state, done))
-                state = [round(-a/1000,3), r]
+                state = [round(-a/1000,3), r,self.game.missile_velocity]
                 action = action_onehot[Action.FIRE]
                 reward = 600
-                next_state = [round(-a/1000,3), r]
+                next_state = [round(-a/1000,3), r,self.game.missile_velocity]
                 done = False
                 self.synthetic_memory.append((state, action, reward, next_state, done))
             
             
             for a in range(121,519,1):
-                state = [round(a/1000,3), r]
-                action = action_onehot[Action.A_DOWN]
+                state = [round(a/1000,3), r,self.game.missile_velocity]
+                action = action_onehot[Action.A_DOWN,self.game.missile_velocity]
                 reward = 60
                 a -= ANGLE_DOWN_SMALL
-                next_state = [round(a/1000,3), r]
+                next_state = [round(a/1000,3), r,self.game.missile_velocity]
                 done = False
                 self.synthetic_memory.append((state, action, reward, next_state, done))
 
             for a in range(-121,-519,-1):
-                state = [round(a/1000,3), r]
+                state = [round(a/1000,3), r,self.game.missile_velocity]
                 action = action_onehot[Action.A_UP]
                 reward = 60
                 a += ANGLE_UP_SMALL
-                next_state = [round(a/1000,3), r]
+                next_state = [round(a/1000,3), r,self.game.missile_velocity]
                 done = False
                 self.synthetic_memory.append((state, action, reward, next_state, done))
 
-        for r in range(701,1200,1):
+        for r in range(701,1400,1):
             #longer range narrow down fire at -.0075 to +0.0075
             for a in range(0,75,1):
-                state = [round(a/1000,3), r]
+                state = [round(a/1000,3), r,self.game.missile_velocity]
                 action = action_onehot[Action.FIRE]
                 reward = 600
-                next_state = [round(a/1000,3), r]
+                next_state = [round(a/1000,3), r,self.game.missile_velocity]
                 done = False
                 self.synthetic_memory.append((state, action, reward, next_state, done))
-                state = [round(-a/1000,3), r]
+                state = [round(-a/1000,3), r,self.game.missile_velocity]
                 action = action_onehot[Action.FIRE]
                 reward = 600
-                next_state = [round(-a/1000,3), r]
+                next_state = [round(-a/1000,3), r,self.game.missile_velocity]
                 done = False
                 self.synthetic_memory.append((state, action, reward, next_state, done))
 
             for a in range(75,519,1):
-                state = [round(a/1000,3), r]
+                state = [round(a/1000,3), r,self.game.missile_velocity]
                 action = action_onehot[Action.A_DOWN]
                 reward = 60
                 a -= ANGLE_DOWN_SMALL
-                next_state = [round(a/1000,3), r]
+                next_state = [round(a/1000,3), r,self.game.missile_velocity]
                 done = False
                 self.synthetic_memory.append((state, action, reward, next_state, done))
 
             for a in range(-75,-519,-1):
-                state = [round(a/1000,3), r]
+                state = [round(a/1000,3), r,self.game.missile_velocity]
                 action = action_onehot[Action.A_UP]
                 reward = 60
                 a += ANGLE_UP_SMALL
-                next_state = [round(a/1000,3), r]
+                next_state = [round(a/1000,3), r,self.game.missile_velocity]
                 done = False
                 self.synthetic_memory.append((state, action, reward, next_state, done))
     
-        for r in range(1,1200,1):
+        for r in range(1,1400,1):
             # across all ranges, rapidally move to minimise angle 
             for a in range(-520,-1572,-1):
-                state = [round(a/1000,3), r]
+                state = [round(a/1000,3), r,self.game.missile_velocity]
                 action = action_onehot[Action.A_UP_LARGE]
                 reward = 60
                 a += ANGLE_UP
-                next_state = [round(a/1000,3), r]
+                next_state = [round(a/1000,3), r,self.game.missile_velocity]
                 done = False
                 self.synthetic_memory.append((state, action, reward, next_state, done))
 
             for a in range(520,1572,1):
-                state = [round(a/1000,3), r]
+                state = [round(a/1000,3), r,self.game.missile_velocity]
                 action = action_onehot[Action.A_DOWN_LARGE]
                 reward = 60
                 a -= ANGLE_DOWN
-                next_state = [round(a/1000,3), r]
+                next_state = [round(a/1000,3), r,self.game.missile_velocity]
                 done = False
                 self.synthetic_memory.append((state, action, reward, next_state, done))
 
@@ -263,63 +265,63 @@ class Agent:
             doNegative = False
             if doNegative == True:
                 for a in range(121,520,1):
-                    state = [round(a/1000,3), r]
+                    state = [round(a/1000,3), r,self.game.missile_velocity]
                     # want an A_DOWN but get....
                     action = action_onehot[random.choice([Action.A_DOWN_LARGE, Action.A_UP, Action.FIRE,Action.A_UP_LARGE])]
                     reward = -20
-                    next_state = [round(a/1000,3), r]
+                    next_state = [round(a/1000,3), r,self.game.missile_velocity]
                     done = False
                     self.synthetic_memory.append((state, action, reward, next_state, done))
             
             
                 for a in range(-520,-1572,-1):
-                    state = [round(a/1000,3), r]
+                    state = [round(a/1000,3), r,self.game.missile_velocity]
                     # want an A_UP_LARGE but get....
                     action = action_onehot[random.choice([Action.A_DOWN_LARGE, Action.A_DOWN, Action.FIRE,Action.A_UP])]
                     reward = -20
-                    next_state = [round(a/1000,3), r]
+                    next_state = [round(a/1000,3), r,self.game.missile_velocity]
                     done = False
                     self.synthetic_memory.append((state, action, reward, next_state, done))   
 
                 for a in range(520,1572,1):
-                    state = [round(a/1000,3), r]
+                    state = [round(a/1000,3), r,self.game.missile_velocity]
                     # want an A_DOWN_LARGE but get....
                     action = action_onehot[random.choice([Action.FIRE, Action.A_UP, Action.A_DOWN,Action.A_UP_LARGE])]
                     reward = -20
-                    next_state = [round(a/1000,3), r]
+                    next_state = [round(a/1000,3), r,self.game.missile_velocity]
                     done = False
                     self.synthetic_memory.append((state, action, reward, next_state, done))
 
 
                 for a in range(-121,-520,-1):
-                    state = [round(a/1000,3), r]
+                    state = [round(a/1000,3), r,self.game.missile_velocity]
                     # want an A_UP but get....
                     action = action_onehot[random.choice([Action.A_DOWN_LARGE, Action.A_UP_LARGE, Action.FIRE,Action.A_DOWN])]
                     reward = -20
-                    next_state = [round(a/1000,3), r]
+                    next_state = [round(a/1000,3), r,self.game.missile_velocity]
                     done = False
                     self.synthetic_memory.append((state, action, reward, next_state, done))
 
                 for a in range(121,520,1):
-                    state = [round(a/1000,3), r]
+                    state = [round(a/1000,3), r,self.game.missile_velocity]
                     # want an A_DOWN but get....
                     action = action_onehot[random.choice([Action.A_UP_LARGE, Action.A_UP, Action.FIRE,Action.A_DOWN_LARGE])]
                     reward = -20
-                    next_state = [round(a/1000,3), r]
+                    next_state = [round(a/1000,3), r,self.game.missile_velocity]
                     done = False
                     self.synthetic_memory.append((state, action, reward, next_state, done))
 
                 for a in range(0,120,1):
-                    state = [round(a/1000,3), r]
+                    state = [round(a/1000,3), r,self.game.missile_velocity]
                     action = action_onehot[random.choice([Action.A_UP_LARGE, Action.A_UP, Action.A_DOWN,Action.A_DOWN_LARGE])]
                     reward = -20
-                    next_state = [round(a/1000,3), r]
+                    next_state = [round(a/1000,3), r,self.game.missile_velocity]
                     done = False
                     self.synthetic_memory.append((state, action, reward, next_state, done))
-                    state = [round(-a/1000,3), r]
+                    state = [round(-a/1000,3), r,self.game.missile_velocity]
                     action = action_onehot[random.choice([Action.A_UP_LARGE, Action.A_UP, Action.A_DOWN,Action.A_DOWN_LARGE])]
                     reward = -20
-                    next_state = [round(-a/1000,3), r]
+                    next_state = [round(-a/1000,3), r,self.game.missile_velocity]
                     done = False
                     self.synthetic_memory.append((state, action, reward, next_state, done))
 
@@ -341,7 +343,7 @@ class Agent:
             state, action, reward, next_state, done = mini_sample[idx]
             if (action == action_onehot[Action.FIRE]) and (reward > 0):
                 next_state = [round(random.randint(0,1572)/10000,3),
-                                    random.randint(10,1200)]
+                                    random.randint(10,1200),self.game.missile_velocity]
                 mini_sample[idx] = (state, action, reward, next_state, done)
         states, actions, rewards, next_states, dones = zip(*mini_sample)
 
@@ -383,14 +385,14 @@ class Agent:
             move = random.choice(action_list)
             final_move = action_onehot[move]
         else:
-            state0 = torch.tensor(state, dtype=torch.float32)
+            state0 = torch.tensor(state, dtype=torch.float)
             prediction = self.model(state0)
             move = int(torch.argmax(prediction).item())
             final_move = int_onehot[move]
         return final_move
 
     def get_model_action(self, state):
-        state0 = torch.tensor(state, dtype=torch.float32)
+        state0 = torch.tensor(state, dtype=torch.float)
         prediction = self.model(state0)
         move = int(torch.argmax(prediction).item())
         final_move = int_onehot[move]
@@ -405,9 +407,9 @@ class Agent:
                 -math.pi/512,-math.pi/256,-math.pi/128, -math.pi/64, -math.pi/32,-math.pi/16,-math.pi/12, -math.pi/8, -math.pi/6,-math.pi/4,  -math.pi/3,-math.pi/2]:
             a = []
             col = ""
-            for r in [50,100,200,300,400,500,600,700,900,1000,1100,1200]:
-                action = self.get_model_action([round(i,3), r])
-                a.append((action,[round(i,3),r]))
+            for r in [50,100,200,300,400,500,600,700,900,1000,1100,1200,1300]:
+                action = self.get_model_action([round(i,3), r,self.game.missile_velocity])
+                a.append((action,[round(i,3),r,self.game.missile_velocity]))
             for t in a:
                 action, state = t
                 if action == Action.A_DOWN_LARGE:
@@ -440,14 +442,14 @@ class Agent:
     def save(self,filename):
             self.trainer.save(filename)
 
-def train(lr=0.0001, episodes=300_000_000,ogamma=0.7):
+def train(lr=0.0001, episodes=300_000_000,ogamma=0.7,decay_iterations=40_000):
     plot_scores = []
     plot_mean_scores = []
     total_score = 0
     total_reward = 0
     record = 0
-    agent = Agent(lr=lr,decay_iterations=40_000,ogamma=ogamma)
-    game = BallisticGameAI()
+    agent = Agent(lr=lr,decay_iterations=decay_iterations,ogamma=ogamma)
+    agent.game = game = BallisticGameAI()
     game_reward = 0
     episode = 0
     while episode < episodes:
@@ -502,10 +504,10 @@ def train(lr=0.0001, episodes=300_000_000,ogamma=0.7):
 
             #if agent.n_games % 2 == 0:
             #firedata = agent.n_games
-            if agent.n_games == 100:
-                firedata = 100
-            if agent.n_games >= 100:
-                if firedata < 750:
+            if agent.n_games == 500:
+                firedata = 500
+            if agent.n_games >= 500:
+                if firedata < 1000:
                     firedata += 1
             else:
                 firedata = 0
@@ -518,7 +520,7 @@ def train(lr=0.0001, episodes=300_000_000,ogamma=0.7):
 
 
             total_reward += game_reward
-            if score >= record or (agent.n_games %100) == 1:
+            if score >= record or (agent.n_games %50) == 1:
                 record = score
                 agent.save(filename='model.pth.'+ str(episode))
                 #agent.model_describe()
@@ -570,7 +572,7 @@ def play(speed=4,filename='model.pth'):
         # get old state
         state = agent.get_state(game)
 
-        state0 = torch.tensor(state, dtype=torch.float32)
+        state0 = torch.tensor(state, dtype=torch.float)
         prediction = agent.model(state0)
         move = int(torch.argmax(prediction).item())
         final_move = int_onehot[move]
@@ -603,7 +605,11 @@ def play(speed=4,filename='model.pth'):
             plot(plot_scores, plot_mean_scores,'Playing')
 
 if __name__ == '__main__':
-    #train(lr=0.001,episodes=600_000, ogamma=0.75)
+    # angle,range, train(lr=0.001,episodes=600_000, ogamma=0.75)
+    # angle,range,velocity,state
+    #train(lr=0.001,episodes=2_500_000, ogamma=0.825,decay_iterations=100_000)
+    train(lr=0.001,episodes=2_500_000, ogamma=0.89,decay_iterations=100_000)
+
     #supertrain()
     play(speed=120,filename='model.pth')
  
