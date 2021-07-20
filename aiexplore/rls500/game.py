@@ -16,6 +16,7 @@ black = pygame.Color('black')
 red = pygame.Color('red')
 blue = pygame.Color('blue')
 yellow = pygame.Color('yellow')
+grey = pygame.Color('grey')
 
 width, height = 1200, 900
 missile_size = 38
@@ -52,14 +53,60 @@ MOVE_REWARD_LARGE = (MOVE_REWARD_NORMAL+1) * ANGLE_UP/ANGLE_UP_SMALL
 
 Point = namedtuple('Point', 'x, y')
 
+class AABattery:
+    def __init__(self, x=20, y=890):
+        self.location = Point(x,y)
+        self.rect = pygame.Rect(self.location.x, self.location.y, 15, 18 )
+        self.alpha = round(random.randint(0,1572)/10000,3)
+        self.dt = 0.005
+        self.velocity = 600
+
+    def render(self,display):
+        pygame.draw.rect(display, white, self.rect)
+        x,y =  trajectory.trajectory(4,self.alpha,self.velocity,self.dt*10)
+        if len(x) > 0:
+            for i in range(len(x)):
+                p = pygame.Rect(self.location.x +10 +x[i],
+                                self.location.y -2 -y[i], 1, 1)
+                pygame.draw.rect(display, white, p)
+    
+    def rotate(self,angle):
+        self.alpha += angle
+
+        if self.alpha <= 0.0:
+            self.alpha = 0.001
+        if self.alpha > math.pi/2:
+            self.alpha = math.pi/2
+    
+    def adjustVel(self,velocity):
+        self.velocity = velocity
+
+class Target:
+    def __init__(self, x=100, y=100, size=38):
+        self.location = Point(x,y)
+        self.size = size
+        self.target_box = pygame.Rect(self.location.x, self.location.y, self.size, self.size)
+
+    def render(self,display):
+        pygame.draw.rect(display, grey, self.target_box)
+        pygame.draw.rect(display, black, pygame.Rect(self.location.x+1,
+                                                            self.location.y+1,
+                                                            self.size-2,
+                                                            self.size-2))
+        pygame.draw.rect(display, red,pygame.Rect(self.location.x+self.size//2,
+                                                            self.location.y+self.size//2,
+                                                            4,4))
+
+
+
+
 class BallisticGameAI:
     def __init__(self, w=width, h=height, speed=SPEED):
         self.w = w
         self.h = h
         self.speed = speed
-        self.missile_size = missile_size
-        self.aabattery_loc = Point(20, self.h-10)
-        self.aabattery =  pygame.Rect(self.aabattery_loc.x, self.aabattery_loc.y, 15, 18 )
+        self.default_target_size = missile_size
+        self.aa = AABattery()
         self.score = 0
         self.frame_iteration = 0
         self.shots = 0
@@ -72,18 +119,13 @@ class BallisticGameAI:
         self.reset()
 
     def reset(self):
-        # init game state
-        #print("previous: iterations",self.frame_iteration," shots: ", self.shots )
         self.score = 0
         self.frame_iteration = 0
-        self.missile_loc = Point(1,1)
-        self.missile_alpha = math.atan(self.h-self.missile_loc.y/self.missile_loc.x)
-        self.missile_range = int(math.sqrt(self.missile_loc.y**2 + self.missile_loc.x**2))
-        self.missile_velocity = 600
-        #self.aabattery_loc = Point(1, self.h-20)
-        self.aabattery =  pygame.Rect(self.aabattery_loc.x, self.aabattery_loc.y, 15, 18 )
-        self.angle = random.randint(10,1500)/1000
-        #self.velocity = 600
+        self.target = Target(50,50,self.default_target_size)
+        self.target_alpha = math.atan(self.h-self.target.location.y/self.target.location.x)
+        self.target_range = int(math.sqrt(self.target.location.y**2 + self.target.location.x**2))
+        self.target_velocity = 600
+        self.aa = AABattery()
         self.dt = 0.005
         self.shots = 300
         self.x = []
@@ -111,13 +153,13 @@ class BallisticGameAI:
         if keys_pressed[pygame.K_c]:
             self.want_ui = 0
         if keys_pressed[pygame.K_UP]:
-            self.missile_size += 1
-            if self.missile_size > 300:
-                self.missile_size = 300
+            self.default_target_size += 1
+            if self.default_target_size > 300:
+                self.default_target_size = 300
         if keys_pressed[pygame.K_DOWN]:
-            self.missile_size -= 1
-            if self.missile_size < 10:
-                self.missile_size = 10
+            self.default_target_size -= 1
+            if self.default_target_size < 10:
+                self.default_target_size = 10
 
         reward = self._close_angle_reward(action)
         self._move(action) 
@@ -131,8 +173,7 @@ class BallisticGameAI:
         if self.shotfired == True:
             r,missile_hit = self._shot_fired_reward(action)
             reward += r
-            #self.angle += random.choice([2*-ANGLE_FIRE_WOBBLE,-ANGLE_FIRE_WOBBLE,ANGLE_FIRE_WOBBLE,2*ANGLE_FIRE_WOBBLE])
-            self.angle += random.choice([-ANGLE_FIRE_WOBBLE,ANGLE_FIRE_WOBBLE])
+            self.aa.rotate(random.choice([-ANGLE_FIRE_WOBBLE,ANGLE_FIRE_WOBBLE]))
 
         #update ui and clock
         if self.want_ui > 0:
@@ -149,39 +190,26 @@ class BallisticGameAI:
         # base screen
         pygame.draw.rect(self.display, black, pygame.Rect(0,0, width, height))
         pygame.draw.rect(self.display, yellow, ground)
-        pygame.draw.rect(self.display, white, self.aabattery)
+        #pygame.draw.rect(self.display, white, self.aabattery)
+        self.aa.render(self.display)
 
         #missile
-        if self.missile is not None:
-            pygame.draw.rect(self.display, red, self.missile)
-            pygame.draw.rect(self.display, white,pygame.Rect(self.missile_loc.x+self.missile_size//2,
-                                                            self.missile_loc.y+self.missile_size//2,
-                                                            2,2))
-
-        # aiming sight for visual inspection
-        x,y =  trajectory.trajectory(4,self.angle,self.missile_velocity,self.dt*10)
-        if len(x) > 0:
-            for i in range(len(x)):
-                p = pygame.Rect(self.aabattery.x +10 +x[i],
-                                self.aabattery.y -2 -y[i], 1, 1)
-                pygame.draw.rect(self.display, white, p)
+        if self.target is not None:
+            self.target.render(self.display)
             if self.want_ui > 0:
                 pygame.time.delay(20)
 
         #bullet trajectory if present
+        bc = 0
         for bullet in self.bullet_paths:
-            pygame.draw.rect(self.display, blue, bullet)
+            bc +=1
+            if bc % 2 == 1:
+                pygame.draw.rect(self.display, blue, bullet)
 
         # status line
-        #status = "angle: " + "{:.3f}".format(self.angle) + " velocity: " + str(self.missile_velocity) 
-        #status = status + " shots: " + str(self.shots) + " score: " + str(self.score) 
-        #status = status + " iteration: " + str(self.frame_iteration) + " (" + str(self.missile_size) +","+ "{:.3f}".format(self.missile_alpha)+","+str(self.missile_range)+")"
-        #status = status + " la: " + str(self.last_action)
-
-               # status line
-        status = "angle: " + "{:.3f}".format(self.angle-self.missile_alpha) + " velocity: " + str(self.missile_velocity) +" Range: "+str(self.missile_range)
+        status = "angle: " + "{:.3f}".format(self.aa.alpha-self.target_alpha) + " velocity: " + str(self.aa.velocity) +" Range: "+str(self.target_range)
         status = status + " shots: " + str(self.shots) + " score: " + str(self.score) 
-        status = status + " iteration: " + str(self.frame_iteration) + " (" + str(self.missile_size) +","+ "{:.3f}".format(self.missile_alpha)+")"
+        status = status + " iteration: " + str(self.frame_iteration) + " (" + str(self.target.size) +","+ "{:.3f}".format(self.target_alpha)+")"
         status = status + " la: " + str(self.last_action)
 
         text = font.render(status, True, white)
@@ -203,16 +231,16 @@ class BallisticGameAI:
         if len(self.x) > 0:
             for i in range(len(self.x)):
                 if i % 1 == 0:
-                    bullet = pygame.Rect(self.aabattery.x +10 +self.x[i],
-                                self.aabattery.y -2 -self.y[i], 2, 2)
+                    bullet = pygame.Rect(self.aa.location.x +10 +self.x[i],
+                                self.aa.location.y -2 -self.y[i], 2, 2)
                     self.bullet_paths.append(bullet)
-                    bullet_collide_radius = pygame.Rect(self.aabattery.x +10+4 +self.x[i],
-                                self.aabattery.y -2-4 -self.y[i], 2, 2)
-                    if self.missile.colliderect(bullet_collide_radius):
+                    bullet_collide_radius = pygame.Rect(self.aa.location.x +10+4 +self.x[i],
+                                self.aa.location.y -2-4 -self.y[i], 2, 2)
+                    if self.target.target_box.colliderect(bullet_collide_radius):
                         self.score +=1
                         reward += HIT_REWARD
                         missile_hit=True
-                        angle = round(self.angle-self.missile_alpha,3)
+                        angle = round(self.aa.alpha-self.target_alpha,3)
                         break
         # remove the trajectory 
         self.x = []
@@ -221,7 +249,7 @@ class BallisticGameAI:
 
     def _close_angle_reward(self,action):
         reward = 0
-        angle = round(self.angle-self.missile_alpha,3)
+        angle = round(self.aa.alpha-self.target_alpha,3)
         if action == Action.A_UP:
             if angle > ANGLE_DOWN_SMALL:
                 reward += MOVE_PENALTY
@@ -259,61 +287,48 @@ class BallisticGameAI:
 
     def _move(self, action):
             if action == Action.A_UP:
-                if self.angle < math.pi/2:
-                    self.angle += ANGLE_UP_SMALL
-                    if self.angle > math.pi/2:
-                        self.angle = math.pi/2
+                if self.aa.alpha < math.pi/2:
+                    self.aa.rotate(ANGLE_UP_SMALL)
                 else:
-                    self.angle = math.pi/2
+                    self.aa.alpha = math.pi/2
 
             if action == Action.A_DOWN:
-                if self.angle > ANGLE_DOWN_SMALL:
-                    self.angle -= ANGLE_DOWN_SMALL
-                    if self.angle <= 0.0:
-                        self.angle = 0
+                if self.aa.alpha > ANGLE_DOWN_SMALL:
+                    self.aa.rotate(-ANGLE_DOWN_SMALL)
                 else:
-                    self.angle = 0
+                    self.aa.alpha = 0
 
             if action == Action.A_UP_LARGE:
-                if self.angle < math.pi/2:
-                    self.angle += ANGLE_UP
-                    if self.angle > math.pi/2:
-                        self.angle = math.pi/2
+                if self.aa.alpha < math.pi/2:
+                    self.aa.rotate(ANGLE_UP)
                 else: 
-                    self.angle = math.pi/2
+                    self.aa.alpha = math.pi/2
 
             if action == Action.A_DOWN_LARGE: 
-                if self.angle > ANGLE_DOWN:
-                    self.angle -= ANGLE_DOWN
-                    if self.angle <= 0.0:
-                        self.angle = 0.001
+                if self.aa.alpha > ANGLE_DOWN:
+                    self.aa.rotate(-ANGLE_DOWN)
                 else:
-                    self.angle = 0.001
+                    self.aa.alpha = 0.001
 
             if action == Action.FIRE:
                     self.shotfired = True
-                    self.x,self.y =  trajectory.trajectory(1000,self.angle,self.missile_velocity,self.dt)
+                    self.x,self.y =  trajectory.trajectory(1000,self.aa.alpha,self.aa.velocity,self.dt)
             return
 
     def find_missile(self):
 
-        #self.missile_loc = Point(random.randint(self.w-1130, self.w-30),
-        #                        random.randint(self.h-900, self.h-50)) 
-        self.missile_loc = Point(random.randint(self.w-1130, self.w-20),
-                                random.randint(self.h-900, self.h-30)) 
-        #self.missile_loc = Point(random.randint(self.w-900, self.w-30),
-        #                        random.randint(self.h-900, self.h-200)) 
-        ay = self.aabattery.y-2-(self.missile_loc.y+self.missile_size//2)
-        ax = (self.missile_loc.x+self.missile_size//2)-self.aabattery.x+10
+        x,y = random.randint(self.w-1130, self.w-20),random.randint(self.h-875, self.h-30)
+        self.target = Target(x,y)
+        ay = self.aa.location.y-2-(self.target.location.y+self.target.size//2)
+        ax = (self.target.location.x+self.target.size//2)-self.aa.location.x+10
         if ax == 0:
             ax = 0.001
-        self.missile_alpha = math.atan(ay/ax)
-        self.missile_range = int(math.sqrt(ay**2 + ax**2))
-        self.missile = pygame.Rect(self.missile_loc.x, self.missile_loc.y, self.missile_size, self.missile_size)
-        self.angle = random.randint(0,15708)/10000
+        self.target_alpha = math.atan(ay/ax)
+        self.target_range = int(math.sqrt(ay**2 + ax**2))
+
     
     def hint(self):
-        angle = round(self.angle-self.missile_alpha,3)
+        angle = round(self.aa.alpha-self.target_alpha,3)
         if angle < ANGLE_DOWN_SMALL and angle > -ANGLE_UP_SMALL:
             return Action.FIRE
 
@@ -330,6 +345,59 @@ class BallisticGameAI:
             return Action.A_UP    
 
         return random.choice([Action.A_UP, Action.A_DOWN, Action.FIRE])
+
+    def synthetic_data(self):
+        synthetic_data = []
+    
+        for r in range(1,700,1):
+            #short range fire at -.012 to +0.012
+            for a in range(0,12,1):
+                state = [round(a/1000,3), r,self.aa.velocity]
+                action = action_onehot[Action.FIRE]
+                reward = 600
+                next_state = [round(a/1000,3), r,self.aa.velocity]
+                done = False
+                synthetic_data.append((state, action, reward, next_state, done))
+                state = [round(-a/1000,3), r,self.aa.velocity]
+                action = action_onehot[Action.FIRE]
+                reward = 600
+                next_state = [round(a/1000,3), r,self.aa.velocity]
+                done = False
+                synthetic_data.append((state, action, reward, next_state, done))
+            for r in range(701,1400,1):
+                #longer range narrow down fire at -.006 to +0.006
+                for a in range(0,6,1):
+                    state = [round(a/1000,3), r]
+                    action = action_onehot[Action.FIRE]
+                    reward = 600
+                    next_state = [round(a/1000,3), r,self.aa.velocity]
+                    done = False
+                    synthetic_data.append((state, action, reward, next_state, done))
+                    state = [round(-a/1000,3), r,self.aa.velocity]
+                    action = action_onehot[Action.FIRE]
+                    reward = 600
+                    next_state = [round(-a/1000,3), r,self.aa.velocity]
+                    done = False
+                    synthetic_data.append((state, action, reward, next_state, done))
+
+            for r in range(1,1400,1):
+                for a in range(7,500,1):
+                    state = [round(a/1000,3), r,self.aa.velocity]
+                    action = action_onehot[Action.A_DOWN]
+                    reward = 60
+                    a -= ANGLE_DOWN_SMALL
+                    next_state = [round(a/1000,3), r,self.aa.velocity]
+                    done = False
+                    synthetic_data.append((state, action, reward, next_state, done))
+                for a in range(-7,-500,-1):
+                    state = [round(a/1000,3), r,self.aa.velocity]
+                    action = action_onehot[Action.A_UP]
+                    reward = 60
+                    a += ANGLE_UP_SMALL
+                    next_state = [round(a/1000,3), r,self.aa.velocity]
+                    done = False
+                    synthetic_data.append((state, action, reward, next_state, done))
+        return synthetic_data
 
 if __name__ == "__main__":
 
