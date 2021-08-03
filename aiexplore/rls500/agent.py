@@ -1,9 +1,12 @@
+from pygame.display import mode_ok
 import torch
 import random
 import numpy as np
 from collections import deque
 
-from game import BallisticGameAI, AABattery,Action, Point,ANGLE_FIRE_WOBBLE,ANGLE_UP_SMALL,ANGLE_UP,ANGLE_DOWN_SMALL,ANGLE_DOWN
+from agenttypes import Action,onehot_action,action_onehot,int_onehot,action_list,state_info
+from agenttypes import Point, StateStanza
+from game import BallisticGameAI, AABattery,ANGLE_FIRE_WOBBLE,ANGLE_UP_SMALL,ANGLE_UP,ANGLE_DOWN_SMALL,ANGLE_DOWN
 from model import Linear_QNet, QTrainer
 from helper import plot
 import os
@@ -11,6 +14,7 @@ import math
 import time
 from termcolor import colored
 import json
+
 
 
 #derived from https://github.com/python-engineer/snake-ai-pytorch
@@ -25,39 +29,32 @@ LR = 0.00001
 # full hinting after 1590 runs it got to 1.6350799082655783e-06 Nd rN out of episodes
 LR = 0.001
 
+class ScoringData:
+    def __init__(self, data=None, game=None):
+        self.data = data
+        self.game = game
 
-onehot_action = { 
-    (1,0,0,0,0): Action.A_UP,
-    (0,1,0,0,0): Action.A_DOWN,
-    (0,0,1,0,0): Action.FIRE,
-    (0,0,0,1,0): Action.A_UP_LARGE,
-    (0,0,0,0,1): Action.A_DOWN_LARGE
-}
+    def parse(self,d):
+        if self.game is not None:
+            return self.game.parse(d)
+        else:
+            return None,None,None,None,None
 
-action_onehot = { 
-    Action.A_UP:   [1,0,0,0,0],
-    Action.A_DOWN: [0,1,0,0,0],
-    Action.FIRE:   [0,0,1,0,0], 
-    Action.A_UP_LARGE:   [0,0,0,1,0],
-    Action.A_DOWN_LARGE:   [0,0,0,0,1],
-}
-int_onehot = {
-    0:   [1,0,0,0,0],
-    1:   [0,1,0,0,0],
-    2:   [0,0,1,0,0],
-    3:   [0,0,0,1,0],
-    4:   [0,0,0,0,1],
+    def score(self,d):
+        # if k is normalised then try variations
+        k = self.parse(d)
+        #otherwise do lookup
+        if k is not None:
+            return k, self.model_dict[k]
+        else:
+            return None,_
 
-}
-
-
-action_list = [Action.A_UP,Action.A_DOWN,Action.FIRE,Action.A_UP_LARGE,Action.A_DOWN_LARGE]
-
-state_info = [
-            'angle',
-            'range',
-            'velocity',
-            ]
+    def sample(self,number=0):
+        if self.data is not None:
+            keys = random.sample(self.data, number)
+        else:
+            keys = []
+        return keys
 
 class Agent:
     # decay ratio of 1.65 for full random
@@ -73,9 +70,10 @@ class Agent:
         self.memory = deque(maxlen=MAX_MEMORY)
         self.hint_memory = deque(maxlen=MAX_MEMORY)
         self.synthetic_memory = deque(maxlen=SYNTHETIC_MAX_MEMORY)
-        #self.synthetic_data()
         self.model = None
         self.game = None
+        self.synthetic_data = None
+        self.scoring_data = None
   
         file_name = os.path.join('./model', filename)
         if os.path.exists(file_name):
@@ -91,16 +89,17 @@ class Agent:
 
 
 
+
     def get_state(self, game): 
-        angle = round(game.aa.alpha-game.target_alpha,3)
-        #return np.array(state, dtype=float)
-        state = [angle,game.target_range,game.aa.velocity]
-        return np.array(state,dtype=float)
+        return game.get_state()
+        #angle = round(game.aa.alpha-game.target_alpha,3)
+        ##return np.array(state, dtype=float)
+        #state = [angle,game.target_range,game.aa.velocity]
+        #return np.array(state,dtype=float)
 
     def add_fire_data(self,number=10):
         if number > len(self.synthetic_memory):
             number = len(self.synthetic_memory)
-
         for s in random.choices(self.synthetic_memory,k=number):
             self.memory.append(s)
 
@@ -125,7 +124,7 @@ class Agent:
             if (action == action_onehot[Action.FIRE]) and (reward > 0):
                 next_state = [round(random.randint(0,1572)/10000,3),
                                     random.randint(10,1200),self.game.aa.velocity]
-                mini_sample[idx] = (state, action, reward, next_state, done)
+                mini_sample[idx] = StateStanza(state, action, reward, next_state, done)
         states, actions, rewards, next_states, dones = zip(*mini_sample)
 
         #print(f'training with len({len(dones)}) {states[0]}, {actions[0]})({states[1]}, {actions[1]})({states[2]}, {actions[2]})')
@@ -181,7 +180,18 @@ class Agent:
         #print(move,final_move,action)
         return action
 
+    def model_sample(self, inputs):
+        """ return a list that has a sample of actions based on state that the model would produce, inputs are the values that are queried from the model"""
+        ret = []
+        for sample in inputs:
+            i,v = sample
+            action = self.get_model_action([round(i,3), r,self.game.aa.velocity])
+            ret.append((action,[round(i,3),r,self.game.aa.velocity]))
+        return ret
+
+
     def model_describe(self):
+        """ return a list of printable lines that allow a simple visualization of the state of the model"""
         cols = []
         for i in [ math.pi/2, math.pi/3,math.pi/4, math.pi/6, math.pi/8,math.pi/12, math.pi/16,math.pi/32, math.pi/64,math.pi/128, math.pi/256, math.pi/512, 
                 0, 
@@ -226,11 +236,14 @@ class Agent:
 def train(lr=0.0001, episodes=300_000_000,ogamma=0.7,decay_iterations=40_000):
     plot_scores = []
     plot_mean_scores = []
+    model_scores = []
+    max_model_score = 0
     total_score = 0
     total_reward = 0
     record = 0
     agent = Agent(lr=lr,decay_iterations=decay_iterations,ogamma=ogamma)
     agent.game = game = BallisticGameAI()
+    agent.scoring_data = ScoringData(game.synthetic_data(),game)
     game_reward = 0
     episode = 0
     while episode < episodes:
@@ -304,19 +317,41 @@ def train(lr=0.0001, episodes=300_000_000,ogamma=0.7,decay_iterations=40_000):
 
 
             total_reward += game_reward
-            if score >= record or (agent.n_games %50) == 1:
+
+            # attempt to score the model so that we have something better than score as the score is not good enough.
+            model_score = 0
+            samples = agent.scoring_data.sample(1000)
+            for s in samples:
+                state, action, reward, next_state, done = agent.scoring_data.parse(s)
+                #check the model against the scoring data to see if they match.
+                predicted_move = agent.get_action(state)
+                #predicted_action = onehot_action[tuple(predicted_move)]
+                if predicted_move == action:
+                    model_score +=1
+                
+            if model_score > max_model_score:
+                if model_score >  max_model_score * 1.05:
+                    agent.save(filename='max_model.pth.'+ str(model_score))
+                    agent.model_describe_print(model_score)
+                max_model_score = model_score
+
+
+            if max_model_score == model_score or score >= record or (agent.n_games %50) == 1:
                 record = score
                 agent.save(filename='model.pth.'+ str(episode))
                 #agent.model_describe()
             agent.model_describe_print(episode)
 
+
+
             #print('Game', agent.n_games, 'Score', score, 'Record:', record, "Game_Reward: ", game_reward, " Mem: ", len(agent.memory)," lr ",agent.trainer.lr, " Episode ", episode)
             game_reward = 0
             plot_scores.append(score)
+            model_scores.append(model_score)
             total_score += score
             mean_score = total_score / agent.n_games
             plot_mean_scores.append(mean_score)
-            _=plot(plot_scores, plot_mean_scores,'Training')
+            _=plot(plot_scores, plot_mean_scores,model_scores,'Training')
     agent.save(filename='model.pth.'+ str(episode))
 
 def supertrain(lr=0.001, episodes=30000,decay_iterations=70_000, iter_growth_val=1.12,ogamma=0.7):
@@ -388,12 +423,14 @@ def play(speed=4,filename='model.pth'):
             plot_mean_scores.append(mean_score)
             plot(plot_scores, plot_mean_scores,'Playing')
 
+
+
 if __name__ == '__main__':
     # angle,range, train(lr=0.001,episodes=600_000, ogamma=0.75)
     # angle,range,velocity,state
     #train(lr=0.001,episodes=2_500_000, ogamma=0.825,decay_iterations=100_000)
-    #train(lr=0.001,episodes=2_500_000, ogamma=0.89,decay_iterations=100_000)
+    train(lr=0.001,episodes=2_500_000, ogamma=0.89,decay_iterations=100_000)
 
     #supertrain()
-    play(speed=120,filename='model.pth')
+    #play(speed=120,filename='model.pth')
  

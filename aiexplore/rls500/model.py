@@ -23,35 +23,8 @@ class Linear_QNet(nn.Module):
     def forward(self, x):
         return self.linear_relu_stack(x)
 
-
-#class Linear_QNet(nn.Module):
-#    def __init__(self, input_size, hidden_size, output_size):
-#        super().__init__()
-#        #self.linear1 = nn.Linear(input_size, hidden_size)
-#        #self.linear2 = nn.Linear(hidden_size, output_size)
-#        self.linear1 = nn.Linear(input_size, hidden_size)
-#        self.linearA = nn.Linear(hidden_size, hidden_size+16)
-#        self.linearB = nn.Linear(hidden_size+16, hidden_size)
-#        self.linear2 = nn.Linear(hidden_size, output_size)
-#
-#    def forward(self, x):
-#        x = F.relu(self.linear1(x))
-#        x = F.relu(self.linearA(x))
-#        x = F.relu(self.linearB(x))
-#        x = self.linear2(x)
-#        return x
-
     def save(self, file_name='model.pth'):
-        #model_folder_path = './model'
-        #if not os.path.exists(model_folder_path):
-        #    os.makedirs(model_folder_path)
-        #file_name = os.path.join(model_folder_path, file_name)
         torch.save(self, file_name)
-
-
-        #for param_tensor in self.state_dict():
-        #    print(param_tensor, "\t", self.state_dict()[param_tensor].size())
-        #    print(param_tensor, "\t", self.state_dict()[param_tensor])
 
 class QTrainer:
     def __init__(self, model, lr, gamma,decay_iterations=50_000, iter_growth_val = 1.1,ogamma=0.7):
@@ -72,8 +45,6 @@ class QTrainer:
         self.iterations += 1
         if self.iterations*BATCH_SIZE > self.decay_iterations:
             self.iterations = 0 
-            #self.decay_steps += 1
-            #self.decay_iterations = self.decay_iterations * self.decay_ratio
             self.decay_iterations = self.decay_iterations + (BATCH_SIZE * self.decay_steps) * self.iter_growth_val
             self.decay_steps += 1
             if self.decay_steps < 5:
@@ -87,8 +58,6 @@ class QTrainer:
             #self.lr = self.lr / self.decay_ratio
             #self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
             print(" ************************************ Scheduler.step() *****************************", )
-            #print(self.scheduler.state_dict())
-            #print(" ************************************")
             self.scheduler.step()
             print(" ************************************")
             print(self.scheduler.state_dict())

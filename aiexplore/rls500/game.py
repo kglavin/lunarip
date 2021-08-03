@@ -1,12 +1,14 @@
 import pygame
 import random
-from enum import Enum
-from collections import namedtuple
+
+
 import numpy as np
 import math
 
 from pygame.display import mode_ok
 import trajectory
+from agenttypes import Point, Action,StateStanza
+from agenttypes import onehot_action,action_onehot,int_onehot,action_list
 
 
 pygame.init()
@@ -30,13 +32,6 @@ ground = pygame.Rect(0, height-2, width, 2 )
 SPEED = 600
 MAX_ITERATIONS=600
 
-class Action(Enum):
-    A_UP = 0,
-    A_DOWN = 1,
-    FIRE = 2,
-    A_UP_LARGE = 3,
-    A_DOWN_LARGE = 4
-
 ANGLE_UP_SMALL = math.pi/360
 ANGLE_UP = ANGLE_UP_SMALL*20
 
@@ -50,8 +45,6 @@ MOVE_PENALTY = -10
 MOVE_REWARD_NORMAL = 10
 MOVE_REWARD_LARGE = (MOVE_REWARD_NORMAL+1) * ANGLE_UP/ANGLE_UP_SMALL
 
-
-Point = namedtuple('Point', 'x, y')
 
 class AABattery:
     def __init__(self, x=20, y=890):
@@ -184,6 +177,13 @@ class BallisticGameAI:
         self.bullet_paths = []
 
         return reward, game_over, self.score,missile_hit
+
+    def get_state(self): 
+        angle = round(self.aa.alpha-self.target_alpha,3)
+        #return np.array(state, dtype=float)
+        state = [angle,self.target_range,self.aa.velocity]
+        return np.array(state,dtype=float)
+
 
 
     def update_ui(self):
@@ -348,56 +348,58 @@ class BallisticGameAI:
 
     def synthetic_data(self):
         synthetic_data = []
-    
         for r in range(1,700,1):
             #short range fire at -.012 to +0.012
             for a in range(0,12,1):
+                synthetic_data.append(StateStanza([round(a/1000,3),r,self.aa.velocity],
+                                        action_onehot[Action.FIRE],
+                                        600,
+                                        [round(a/1000,3), r,self.aa.velocity],
+                                        False))
+                synthetic_data.append(StateStanza([round(-a/1000,3),r,self.aa.velocity],
+                                        action_onehot[Action.FIRE],
+                                        600,
+                                        [round(-a/1000,3), r,self.aa.velocity],
+                                        False))
+        for r in range(701,1400,1):
+            #longer range narrow down fire at -.006 to +0.006
+            for a in range(0,6,1):
+                synthetic_data.append(StateStanza([round(a/1000,3),r,self.aa.velocity],
+                                        action_onehot[Action.FIRE],
+                                        600,
+                                        [round(a/1000,3), r,self.aa.velocity],
+                                        False))
+                synthetic_data.append(StateStanza([round(-a/1000,3),r,self.aa.velocity],
+                                        action_onehot[Action.FIRE],
+                                        600,
+                                        [round(-a/1000,3), r,self.aa.velocity],
+                                        False))
+        for r in range(1,1400,1):
+            for a in range(7,500,1):
                 state = [round(a/1000,3), r,self.aa.velocity]
-                action = action_onehot[Action.FIRE]
-                reward = 600
+                action = action_onehot[Action.A_DOWN]
+                a -= ANGLE_DOWN_SMALL
                 next_state = [round(a/1000,3), r,self.aa.velocity]
-                done = False
-                synthetic_data.append((state, action, reward, next_state, done))
-                state = [round(-a/1000,3), r,self.aa.velocity]
-                action = action_onehot[Action.FIRE]
-                reward = 600
-                next_state = [round(a/1000,3), r,self.aa.velocity]
-                done = False
-                synthetic_data.append((state, action, reward, next_state, done))
-            for r in range(701,1400,1):
-                #longer range narrow down fire at -.006 to +0.006
-                for a in range(0,6,1):
-                    state = [round(a/1000,3), r]
-                    action = action_onehot[Action.FIRE]
-                    reward = 600
-                    next_state = [round(a/1000,3), r,self.aa.velocity]
-                    done = False
-                    synthetic_data.append((state, action, reward, next_state, done))
-                    state = [round(-a/1000,3), r,self.aa.velocity]
-                    action = action_onehot[Action.FIRE]
-                    reward = 600
-                    next_state = [round(-a/1000,3), r,self.aa.velocity]
-                    done = False
-                    synthetic_data.append((state, action, reward, next_state, done))
+                synthetic_data.append(StateStanza(state, action, 60, next_state, False))
 
-            for r in range(1,1400,1):
-                for a in range(7,500,1):
-                    state = [round(a/1000,3), r,self.aa.velocity]
-                    action = action_onehot[Action.A_DOWN]
-                    reward = 60
-                    a -= ANGLE_DOWN_SMALL
-                    next_state = [round(a/1000,3), r,self.aa.velocity]
-                    done = False
-                    synthetic_data.append((state, action, reward, next_state, done))
-                for a in range(-7,-500,-1):
-                    state = [round(a/1000,3), r,self.aa.velocity]
-                    action = action_onehot[Action.A_UP]
-                    reward = 60
-                    a += ANGLE_UP_SMALL
-                    next_state = [round(a/1000,3), r,self.aa.velocity]
-                    done = False
-                    synthetic_data.append((state, action, reward, next_state, done))
+            for a in range(-7,-500,-1):
+                state = [round(a/1000,3), r,self.aa.velocity]
+                action = action_onehot[Action.A_UP]
+                a += ANGLE_UP_SMALL
+                next_state = [round(a/1000,3), r,self.aa.velocity]
+                synthetic_data.append(StateStanza(state, action, 60, next_state, False))
         return synthetic_data
+
+    def parse(self,d):
+            # takes the state map and creates a normalised key from it 
+            # so (a,state)  is input and we want this normalised 
+            # to start with a passthrough which returns (a,state) 
+            # will work
+            if d is not None:
+                state, action, reward, next_state, done = d
+                return state, action, reward, next_state, done
+            return None,None,None,None,None
+
 
 if __name__ == "__main__":
 

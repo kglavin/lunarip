@@ -5,7 +5,7 @@ from IPython import display
 
 plt.ion()
 
-def plot(scores, mean_scores, title):
+def plot(scores, mean_scores,model_scores, title):
     display.clear_output(wait=True)
     #display.display(plt.gcf())
     plt.clf()
@@ -14,9 +14,11 @@ def plot(scores, mean_scores, title):
     plt.ylabel('Score')
     _ = plt.plot(scores)
     _ = plt.plot(mean_scores)
+    _ = plt.plot(model_scores)
     plt.ylim(ymin=0)
     plt.text(len(scores)-1, scores[-1], str(scores[-1]))
     plt.text(len(mean_scores)-1, mean_scores[-1], str(mean_scores[-1]))
+    plt.text(len(model_scores)-1, model_scores[-1], str(model_scores[-1]))
     _ = plt.show(block=False)
     plt.pause(.1)
 
