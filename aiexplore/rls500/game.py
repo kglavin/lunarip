@@ -21,9 +21,9 @@ yellow = pygame.Color('yellow')
 grey = pygame.Color('grey')
 
 width, height = 1200, 900
-width, height = 600, 480
+width, height = 640, 480
 
-missile_size = 40
+missile_size = 35
 incr_angle = 0.011  # radians   little more than 1 degree
 incr_angle_large = 0.1 # radians 11.4 degrees
 vertical_angle = math.pi/2
@@ -34,19 +34,19 @@ ground = pygame.Rect(0, height-2, width, 2 )
 SPEED = 600
 MAX_ITERATIONS=5000
 
-ANGLE_UP_SMALL = round(math.pi/720,3)
-ANGLE_UP = round(ANGLE_UP_SMALL*15,3)
+ANGLE_DOWN_SMALL = round(math.pi/720,3)
+ANGLE_DOWN = round(ANGLE_DOWN_SMALL*15,3)
 
 #ANGLE_DOWN = ANGLE_UP + 0.00001
 #ANGLE_DOWN_SMALL = ANGLE_UP_SMALL - 0.00001
-ANGLE_DOWN = round(ANGLE_UP,3)
-ANGLE_DOWN_SMALL = round(ANGLE_UP_SMALL+0.001,3)
-ANGLE_FIRE_WOBBLE = round(ANGLE_DOWN_SMALL*0.51,3)
+ANGLE_UP = round(ANGLE_DOWN,3)
+ANGLE_UP_SMALL = round(ANGLE_DOWN_SMALL+0.001,3)
+ANGLE_FIRE_WOBBLE = round(ANGLE_DOWN_SMALL*1.51,3)
 
 HIT_REWARD = 900
 MOVE_PENALTY = -10
 MOVE_REWARD_NORMAL = 10
-MOVE_REWARD_LARGE = (MOVE_REWARD_NORMAL+1) * ANGLE_UP/ANGLE_UP_SMALL
+MOVE_REWARD_LARGE = (MOVE_REWARD_NORMAL+1) * ANGLE_DOWN/ANGLE_DOWN_SMALL
 
 
 class AABattery:
@@ -72,8 +72,8 @@ class AABattery:
 
         if self.alpha <= 0.0:
             self.alpha = round(0.001,3)
-        if self.alpha > math.pi/2:
-            self.alpha = round(math.pi/2,3)
+        if self.alpha > math.pi:
+            self.alpha = round(math.pi,3)
     
     def adjustVel(self,velocity):
         self.velocity = velocity
@@ -171,7 +171,8 @@ class BallisticGameAI:
         if self.shotfired == True:
             r,missile_hit = self._shot_fired_reward(action)
             reward += r
-            self.aa.rotate(random.choice([-ANGLE_FIRE_WOBBLE,ANGLE_FIRE_WOBBLE]))
+            self.aa.rotate(random.choice([-1.7*ANGLE_FIRE_WOBBLE,1.3*ANGLE_FIRE_WOBBLE]))
+
 
         #update ui and clock
         if self.want_ui > 0:
@@ -292,10 +293,10 @@ class BallisticGameAI:
 
     def _move(self, action):
             if action == Action.A_UP:
-                if self.aa.alpha < math.pi/2:
+                if self.aa.alpha < math.pi:
                     self.aa.rotate(ANGLE_UP_SMALL)
                 else:
-                    self.aa.alpha = round(math.pi/2,3)
+                    self.aa.alpha = round(math.pi,3)
 
             if action == Action.A_DOWN:
                 if self.aa.alpha > ANGLE_DOWN_SMALL:
@@ -304,10 +305,10 @@ class BallisticGameAI:
                     self.aa.alpha = 0
 
             if action == Action.A_UP_LARGE:
-                if self.aa.alpha < math.pi/2:
+                if self.aa.alpha < math.pi:
                     self.aa.rotate(ANGLE_UP)
                 else: 
-                    self.aa.alpha = math.pi/2
+                    self.aa.alpha = math.pi
 
             if action == Action.A_DOWN_LARGE: 
                 if self.aa.alpha > ANGLE_DOWN:
@@ -324,12 +325,12 @@ class BallisticGameAI:
 
         #x,y = random.randint(self.w-1130, self.w-80),random.randint(self.h-800, self.h-50)
         #x,y = random.randint(self.w-1130, self.w-900),random.randint(self.h-500, self.h-50)
-        x,y = random.randint(self.w-570, self.w-350),random.randint(self.h-350, self.h-50)
+        x,y = random.randint(self.w-610, self.w-30),random.randint(self.h-450, self.h-50)
         self.target = Target(x,y)
         ay = self.aa.location.y-2-(self.target.location.y+self.target.size//2)
         ax = (self.target.location.x+self.target.size//2)-self.aa.location.x+10
         if ax == 0:
-            ax = 0.001
+            ax = 0.0001
         self.target_alpha = round(math.atan(ay/ax),3)
         self.target_range = int(math.sqrt(ay**2 + ax**2))
 
@@ -392,7 +393,7 @@ class BallisticGameAI:
 
     def synthetic_data(self):
         rng = 1400
-        rng = 250
+        rng = 500
         synthetic_data = self.fire_data(rng)
 
         for r in range(701,rng,1):
@@ -423,13 +424,13 @@ class BallisticGameAI:
                 next_state = [round(a/1000,3), r,self.aa.velocity]
                 synthetic_data.append(StateStanza(state, action, MOVE_REWARD_NORMAL, next_state, False))
 
-            for a in range(61,1500,1):
+            for a in range(61,1700,1):
                 state = [round(a/1000,3), r,self.aa.velocity]
                 action = action_onehot[Action.A_DOWN_LARGE]
                 a -= ANGLE_DOWN
                 next_state = [round(a/1000,3), r,self.aa.velocity]
                 synthetic_data.append(StateStanza(state, action, MOVE_REWARD_LARGE, next_state, False))
-            for a in range(-61,-1500,-1):
+            for a in range(-61,-1700,-1):
                 state = [round(a/1000,3), r,self.aa.velocity]
                 action = action_onehot[Action.A_UP_LARGE]
                 a += ANGLE_UP

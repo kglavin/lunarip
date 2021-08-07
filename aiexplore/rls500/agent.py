@@ -68,7 +68,7 @@ class Agent:
         self.iter_growth_val = iter_growth_val
         self.ogamma = ogamma
         self.memory = deque(maxlen=MAX_MEMORY)
-        self.hint_memory = deque(maxlen=MAX_MEMORY)
+        #self.hint_memory = deque(maxlen=MAX_MEMORY)
         #self.synthetic_memory = deque(maxlen=SYNTHETIC_MAX_MEMORY)
         self.model = None
         self.game = None
@@ -80,7 +80,7 @@ class Agent:
             self.model = torch.load(file_name)
             print("loaded")
         else:
-            self.model = Linear_QNet(len(state_info), 16, len(onehot_action)) # first parm is the lenght of the state array 
+            self.model = Linear_QNet(len(state_info), 64, len(onehot_action)) # first parm is the lenght of the state array 
         for param_tensor in self.model.state_dict():
             print(param_tensor, "\t", self.model.state_dict()[param_tensor].size())
             print(param_tensor, "\t", self.model.state_dict()[param_tensor])
@@ -116,45 +116,25 @@ class Agent:
     def remember(self, state, action, reward, next_state, done):
             self.memory.append((state, action, reward, next_state, done)) 
     
-    def hint_remember(self, state, action, reward, next_state, done):
-        self.hint_memory.append((state, action, reward, next_state, done)) 
-
-    def train_long_memory_with_synthetic(self,discount=0.01):
-        ## add in a set of synthetic data into the memory
-        if len(self.synthetic_memory) > BATCH_SIZE:
-            mini_sample = random.sample(self.synthetic_memory, BATCH_SIZE)
-        else:
-            mini_sample = random.sample(self.synthetic_memory, len(self.synthetic_memory)) 
-
-        for idx in range(len(mini_sample)):
-            state, action, reward, next_state, done = mini_sample[idx]
-            if (action == action_onehot[Action.FIRE]) and (reward > 0):
-                next_state = [round(random.randint(0,1572)/10000,3),
-                                    random.randint(10,1200),self.game.aa.velocity]
-                mini_sample[idx] = StateStanza(state, action, reward, next_state, done)
-        states, actions, rewards, next_states, dones = zip(*mini_sample)
-
-        #print(f'training with len({len(dones)}) {states[0]}, {actions[0]})({states[1]}, {actions[1]})({states[2]}, {actions[2]})')
-        self.trainer.train_step(states, actions, rewards, next_states, dones)
-        #print("learning rate ",self.trainer.lr," ",self.trainer.decay_ratio," ",self.trainer.iterations)
-
+    #def hint_remember(self, state, action, reward, next_state, done):
+    #    self.hint_memory.append((state, action, reward, next_state, done)) 
 
     def train_long_memory(self):
-        if len(self.memory) > 5*BATCH_SIZE:
-            mini_sample = random.sample(self.memory, 5*BATCH_SIZE)
+        if len(self.memory) > BATCH_SIZE:
+            mini_sample = random.sample(self.memory, BATCH_SIZE)
         else:
             mini_sample = self.memory
         states, actions, rewards, next_states, dones = zip(*mini_sample)
         self.trainer.train_step(states, actions, rewards, next_states, dones)
 
 
-    def train_long_memory_hint(self):
-        if len(self.hint_memory) > BATCH_SIZE:
-            mini_sample = random.sample(self.hint_memory, BATCH_SIZE)
-        else:
-            mini_sample = random.sample(self.hint_memory, len(self.hint_memory))
-        states, actions, rewards, next_states, dones = zip(*mini_sample)
-        self.trainer.train_step(states, actions, rewards, next_states, dones)
+    #def train_long_memory_hint(self):
+    #    if len(self.hint_memory) > BATCH_SIZE:
+    #        mini_sample = random.sample(self.hint_memory, BATCH_SIZE)
+    #    else:
+    #        mini_sample = random.sample(self.hint_memory, len(self.hint_memory))
+    #    states, actions, rewards, next_states, dones = zip(*mini_sample)
+    #    self.trainer.train_step(states, actions, rewards, next_states, dones)
 
  
     def train_short_memory(self, state, action, reward, next_state, done):
@@ -164,20 +144,20 @@ class Agent:
         # instead of guessing provide a hint based on knowledge of the application
         return game.hint()
 
-    def get_action_OLD(self, state):
-        if (self.n_games > 20):
-                #self.epsilon_max += 1
-                self.epsilon_max = self.epsilon *10
-            
-        if random.randint(0, self.epsilon_max) < self.epsilon:
-            move = random.choice(action_list)
-            final_move = action_onehot[move]
-        else:
-            state0 = torch.tensor(state, dtype=torch.float)
-            prediction = self.model(state0)
-            move = int(torch.argmax(prediction).item())
-            final_move = int_onehot[move]
-        return final_move
+   # def get_action_OLD(self, state):
+   #     if (self.n_games > 20):
+   #             #self.epsilon_max += 1
+   #             self.epsilon_max = self.epsilon *10
+   #         
+   #     if random.randint(0, self.epsilon_max) < self.epsilon:
+   #         move = random.choice(action_list)
+   #         final_move = action_onehot[move]
+   #     else:
+   #         state0 = torch.tensor(state, dtype=torch.float)
+   #         prediction = self.model(state0)
+   #         move = int(torch.argmax(prediction).item())
+   #         final_move = int_onehot[move]
+   #     return final_move
 
     def get_action(self, state):
         state0 = torch.tensor(state, dtype=torch.float)
@@ -214,21 +194,21 @@ class Agent:
             a = []
             col = ""
             #for r in [50,100,200,300,400,500,600,700,900,1000,1100,1200,1300,1400]:
-            for r in range(100,250,10):
+            for r in range(1,700,20):
                 action = self.get_model_action([round(i,3), r,self.game.aa.velocity])
                 a.append((action,[round(i,3),r,self.game.aa.velocity]))
             for t in a:
                 action, state = t
                 if action == Action.A_DOWN_LARGE:
-                    col = col + colored('{:6s}','blue',attrs=['reverse']).format(str(state[1]))
+                    col = col + colored('{:4s}','blue',attrs=['reverse']).format(str(state[1]))
                 if action == Action.A_DOWN:
-                    col = col + colored('{:6s}','blue').format(str(state[1]))
+                    col = col + colored('{:4s}','blue').format(str(state[1]))
                 if action == Action.FIRE:
-                    col = col + colored('{:6s}','red').format(str(state[1]))
+                    col = col + colored('{:4s}','red').format(str(state[1]))
                 if action == Action.A_UP_LARGE:
-                    col = col + colored('{:6s}','green',attrs=['reverse']).format(str(state[1]))
+                    col = col + colored('{:4s}','green',attrs=['reverse']).format(str(state[1]))
                 if action == Action.A_UP:
-                    col = col + colored('{:6s}','green').format(str(state[1]))
+                    col = col + colored('{:4s}','green').format(str(state[1]))
             cols.append(('{:6s}'.format(str(round(i,3))),col))
 
         return cols
@@ -273,23 +253,34 @@ def train(lr=0.0001, episodes=300_000_000,ogamma=0.7,decay_iterations=40_000):
     max_rnd = 1  #turnoff hinting from start
     used_hint = 0
     used_model = 0
-    hint = True
+    used_rnd = 0
+    old_used_hint = 0
+    old_used_model = 0
+    old_used_rnd = 0
+    hint = False
     while episode < episodes:
         episode += 1
 
         # get old state
         state_old = agent.get_state(game)
 
+        disable_hint = 0
         if hint == False: 
-            if random.randint(1,max_rnd) == 1: 
-                hint = True
-
-        if hint == True:
+            action_strategy = random.randint(disable_hint,max_rnd)
+            if  action_strategy <= 2 : 
+                used_hint += 1
+                final_move = action_onehot[agent._app_specific_hint(game)]
+            elif action_strategy >= 3 and action_strategy <= 10:
+                used_rnd +=1
+                # focusing on micro moves as these are in the small cone whereas the large moves are over large angles
+                final_move = action_onehot[random.choice([Action.A_UP, Action.A_DOWN, Action.FIRE,Action.A_UP_LARGE,Action.A_DOWN_LARGE])]
+            else:
+                used_model += 1
+                final_move = agent.get_action(state_old)
+        else:
             used_hint += 1
             final_move = action_onehot[agent._app_specific_hint(game)]
-        else:
-            used_model += 1
-            final_move = agent.get_action(state_old)
+        
         action = onehot_action[tuple(final_move)]
 
         # perform move and get new state
@@ -312,9 +303,9 @@ def train(lr=0.0001, episodes=300_000_000,ogamma=0.7,decay_iterations=40_000):
 
         # remember
         agent.remember(state_old, final_move, reward, state_new, done)
-        if hint == True:
-            agent.hint_remember(state_old, final_move, reward, state_new, done)
-            hint = False
+        #if hint == True:
+        #    agent.hint_remember(state_old, final_move, reward, state_new, done)
+        #    hint = False
 
         if game.want_save == True:
             #agent.model.save()
@@ -325,26 +316,14 @@ def train(lr=0.0001, episodes=300_000_000,ogamma=0.7,decay_iterations=40_000):
             # train long memory, plot result
             game.reset()
             agent.n_games += 1
-            if (agent.n_games % 100) == 0:
+            if (agent.n_games % 30) == 0:
                 max_rnd +=1
                 print(f'ngames = {agent.n_games},max_rnd = {max_rnd}')
+            
             if agent.n_games < 40:
                 hint = True
             else:
                 hint = False
-
-            #if agent.n_games % 2 == 0:
-            #firedata = agent.n_games
-            if 1 == 1:
-                if agent.n_games ==  50:
-                    firedata = 100
-                if agent.n_games >= 50:
-                    if firedata < 1000:
-                        firedata += 1
-                else:
-                    firedata = 0
-                print("Adding fire data: ", firedata)
-                agent.add_fire_data(number=firedata,rng=250)
                 
             agent.train_long_memory()
  
@@ -367,11 +346,16 @@ def train(lr=0.0001, episodes=300_000_000,ogamma=0.7,decay_iterations=40_000):
                     agent.model_describe_print(model_score)
                 max_model_score = model_score
 
-            if max_model_score == model_score or score >= record or (agent.n_games %100) == 0:
+#            if max_model_score == model_score or score >= record or (agent.n_games %10) == 0:
+            if  (agent.n_games %1) == 0:
                 record = score
                 agent.save(filename='model.pth.'+ str(episode))
                 #agent.model_describe()
-            print(f'used_hint = {used_hint}, used_model = {used_model}')
+            print(f'used_hint = {used_hint-old_used_hint}/{used_hint}, used_model = {used_model-old_used_model}/{used_model}, used_rnd = {used_rnd-old_used_rnd}/{used_rnd}')
+            old_used_hint = used_hint 
+            old_used_model = used_model
+            old_used_rnd = used_rnd
+
             agent.model_describe_print(episode)
             #print('Game', agent.n_games, 'Score', score, 'Record:', record, "Game_Reward: ", game_reward, " Mem: ", len(agent.memory)," lr ",agent.trainer.lr, " Episode ", episode)
             game_reward = 0
@@ -443,9 +427,11 @@ if __name__ == '__main__':
     # angle,range,velocity,state
     #train(lr=0.001,episodetrain(lr=0.001,episodes=2_500_000, ogamma=0.89,decay_iterations=100_000)
     #train(lr=0.0001,episodes=2_500_000, ogamma=0.89,decay_iterations=100_000)
-    train(lr=0.00001,episodes=2_500_000, ogamma=0.89,decay_iterations=300_000)
+    #with 32 not completing convergenct
+    #train(lr=0.00001,episodes=3_000_000, ogamma=0.89,decay_iterations=150_000)
+    #trying 64
+    train(lr=0.001,episodes=3_000_000, ogamma=0.889,decay_iterations=150_000)
     
-
-    #supertrain()
+    
     #play(speed=120,filename='model.pth')
  
