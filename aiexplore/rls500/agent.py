@@ -80,7 +80,7 @@ class Agent:
             self.model = torch.load(file_name)
             print("loaded")
         else:
-            self.model = Linear_QNet(len(state_info), 64, len(onehot_action)) # first parm is the lenght of the state array 
+            self.model = Linear_QNet(len(state_info), 32, len(onehot_action)) # first parm is the lenght of the state array 
         for param_tensor in self.model.state_dict():
             print(param_tensor, "\t", self.model.state_dict()[param_tensor].size())
             print(param_tensor, "\t", self.model.state_dict()[param_tensor])
@@ -188,13 +188,13 @@ class Agent:
     def model_describe(self):
         """ return a list of printable lines that allow a simple visualization of the state of the model"""
         cols = []
-        for i in [ math.pi/2, math.pi/3,math.pi/4, math.pi/6, math.pi/8,math.pi/12, math.pi/16,math.pi/32, math.pi/64,math.pi/128, math.pi/256, math.pi/512,math.pi/720, 
+        for i in [ math.pi/2, math.pi/2.5, math.pi/3,math.pi/3.5,math.pi/4, math.pi/6, math.pi/8,math.pi/12, math.pi/16,math.pi/32, math.pi/64,math.pi/128, math.pi/256, math.pi/512,math.pi/720, 
                 0, 
-                -math.pi/720,-math.pi/512,-math.pi/256,-math.pi/128, -math.pi/64, -math.pi/32,-math.pi/16,-math.pi/12, -math.pi/8, -math.pi/6,-math.pi/4,  -math.pi/3,-math.pi/2]:
+                -math.pi/720,-math.pi/512,-math.pi/256,-math.pi/128, -math.pi/64, -math.pi/32,-math.pi/16,-math.pi/12, -math.pi/8, -math.pi/6,-math.pi/4,-math.pi/3.5,-math.pi/3,-math.pi/2.5,-math.pi/2]:
             a = []
             col = ""
             #for r in [50,100,200,300,400,500,600,700,900,1000,1100,1200,1300,1400]:
-            for r in range(1,700,20):
+            for r in range(10,720,20):
                 action = self.get_model_action([round(i,3), r,self.game.aa.velocity])
                 a.append((action,[round(i,3),r,self.game.aa.velocity]))
             for t in a:
@@ -257,7 +257,7 @@ def train(lr=0.0001, episodes=300_000_000,ogamma=0.7,decay_iterations=40_000):
     old_used_hint = 0
     old_used_model = 0
     old_used_rnd = 0
-    hint = False
+    hint = True
     while episode < episodes:
         episode += 1
 
@@ -267,10 +267,10 @@ def train(lr=0.0001, episodes=300_000_000,ogamma=0.7,decay_iterations=40_000):
         disable_hint = 0
         if hint == False: 
             action_strategy = random.randint(disable_hint,max_rnd)
-            if  action_strategy <= 2 : 
+            if  action_strategy <= 1 : 
                 used_hint += 1
                 final_move = action_onehot[agent._app_specific_hint(game)]
-            elif action_strategy >= 3 and action_strategy <= 10:
+            elif action_strategy >= 2 and action_strategy <= 10:
                 used_rnd +=1
                 # focusing on micro moves as these are in the small cone whereas the large moves are over large angles
                 final_move = action_onehot[random.choice([Action.A_UP, Action.A_DOWN, Action.FIRE,Action.A_UP_LARGE,Action.A_DOWN_LARGE])]
@@ -316,11 +316,11 @@ def train(lr=0.0001, episodes=300_000_000,ogamma=0.7,decay_iterations=40_000):
             # train long memory, plot result
             game.reset()
             agent.n_games += 1
-            if (agent.n_games % 30) == 0:
+            if (agent.n_games % 100) == 0:
                 max_rnd +=1
                 print(f'ngames = {agent.n_games},max_rnd = {max_rnd}')
             
-            if agent.n_games < 40:
+            if agent.n_games < 100:
                 hint = True
             else:
                 hint = False
@@ -430,8 +430,16 @@ if __name__ == '__main__':
     #with 32 not completing convergenct
     #train(lr=0.00001,episodes=3_000_000, ogamma=0.89,decay_iterations=150_000)
     #trying 64
-    train(lr=0.001,episodes=3_000_000, ogamma=0.889,decay_iterations=150_000)
+    #train(lr=0.001,episodes=3_000_000, ogamma=0.889,decay_iterations=150_000)
+    #trying 72
+    #train(lr=0.0011,episodes=3_000_000, ogamma=0.888,decay_iterations=150_000)
     
-    
-    #play(speed=120,filename='model.pth')
+    #trying 24
+    #train(lr=0.0011,episodes=3_000_000, ogamma=0.888,decay_iterations=150_000)
+
+    #trying 2 hidden layers, 32 hidden in layer.
+    #train(lr=0.001,episodes=4_000_000, ogamma=0.9,decay_iterations=150_000)
+    #train(lr=0.001,episodes=5_000_000, ogamma=0.92,decay_iterations=200_000)
+
+    play(speed=120,filename='model.pth')
  

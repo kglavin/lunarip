@@ -23,7 +23,7 @@ grey = pygame.Color('grey')
 width, height = 1200, 900
 width, height = 640, 480
 
-missile_size = 35
+missile_size = 40
 incr_angle = 0.011  # radians   little more than 1 degree
 incr_angle_large = 0.1 # radians 11.4 degrees
 vertical_angle = math.pi/2
@@ -50,12 +50,12 @@ MOVE_REWARD_LARGE = (MOVE_REWARD_NORMAL+1) * ANGLE_DOWN/ANGLE_DOWN_SMALL
 
 
 class AABattery:
-    def __init__(self, x=20, y=height-20):
-        self.location = Point(x,y)
+    def __init__(self, x=20, y=height-20,z=0):
+        self.location = Point(x,y,z)
         self.rect = pygame.Rect(self.location.x, self.location.y, 15, 18 )
         self.alpha = round(random.randint(0,1572)/10000,3)
-        self.dt = 0.005
-        self.velocity = 600
+        self.dt = 0.0005
+        self.velocity = 2000
 
     def render(self,display):
         pygame.draw.rect(display, white, self.rect)
@@ -79,8 +79,8 @@ class AABattery:
         self.velocity = velocity
 
 class Target:
-    def __init__(self, x=100, y=100, size=missile_size):
-        self.location = Point(x,y)
+    def __init__(self, x=100, y=100,z=100, size=missile_size):
+        self.location = Point(x,y,z)
         self.size = size
         self.target_box = pygame.Rect(self.location.x, self.location.y, self.size, self.size)
 
@@ -103,7 +103,7 @@ class BallisticGameAI:
         self.h = h
         self.speed = speed
         self.default_target_size = missile_size
-        self.aa = AABattery()
+        self.aa = AABattery(x=20, y=height-20)
         self.score = 0
         self.max_iterations=iterations
         self.frame_iteration = 0
@@ -123,8 +123,8 @@ class BallisticGameAI:
         self.target_alpha = math.atan(self.h-self.target.location.y/self.target.location.x)
         self.target_range = int(math.sqrt(self.target.location.y**2 + self.target.location.x**2))
         self.target_velocity = 600
-        self.aa = AABattery()
-        self.dt = 0.005
+        self.aa = AABattery(x=20, y=height-20)
+        self.dt = 0.0005
         self.shots = 1000
         self.x = []
         self.y = []
@@ -158,6 +158,8 @@ class BallisticGameAI:
             self.default_target_size -= 1
             if self.default_target_size < 10:
                 self.default_target_size = 10
+        if keys_pressed[pygame.K_q]:
+            return 0, True, self.score, False
 
         reward = self._close_angle_reward(action)
         self._move(action) 
@@ -171,7 +173,7 @@ class BallisticGameAI:
         if self.shotfired == True:
             r,missile_hit = self._shot_fired_reward(action)
             reward += r
-            self.aa.rotate(random.choice([-1.7*ANGLE_FIRE_WOBBLE,1.3*ANGLE_FIRE_WOBBLE]))
+            self.aa.rotate(random.choice([-7*ANGLE_FIRE_WOBBLE,0,9*ANGLE_FIRE_WOBBLE]))
 
 
         #update ui and clock
@@ -277,11 +279,11 @@ class BallisticGameAI:
                 reward += MOVE_PENALTY
             if angle < -ANGLE_UP:
                 reward += MOVE_REWARD_NORMAL
-            if angle <= -ANGLE_UP*2:
+            if angle <= -ANGLE_UP*1.25:
                 reward += MOVE_REWARD_LARGE
 
         if action == Action.A_DOWN_LARGE:
-            if angle > ANGLE_DOWN*2:
+            if angle > ANGLE_DOWN*1.25:
                 reward += MOVE_REWARD_LARGE
             if angle > ANGLE_DOWN:
                 reward += MOVE_REWARD_NORMAL
@@ -325,12 +327,12 @@ class BallisticGameAI:
 
         #x,y = random.randint(self.w-1130, self.w-80),random.randint(self.h-800, self.h-50)
         #x,y = random.randint(self.w-1130, self.w-900),random.randint(self.h-500, self.h-50)
-        x,y = random.randint(self.w-610, self.w-30),random.randint(self.h-450, self.h-50)
+        x,y = random.randint(self.w-580, self.w-30),random.randint(self.h-450, self.h-50)
         self.target = Target(x,y)
         ay = self.aa.location.y-2-(self.target.location.y+self.target.size//2)
         ax = (self.target.location.x+self.target.size//2)-self.aa.location.x+10
         if ax == 0:
-            ax = 0.0001
+            ax = 0.000001
         self.target_alpha = round(math.atan(ay/ax),3)
         self.target_range = int(math.sqrt(ay**2 + ax**2))
 
