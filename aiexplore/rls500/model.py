@@ -6,6 +6,8 @@ import torch.nn.functional as F
 import os
 import json
 
+from hyper import BATCH_SIZE
+
 #derived from https://github.com/python-engineer/snake-ai-pytorch
 
 class Linear_QNet(nn.Module):
@@ -14,10 +16,9 @@ class Linear_QNet(nn.Module):
         self.linear_relu_stack = nn.Sequential(
             nn.Linear(input_size, hidden_size),
             nn.ReLU(),
-            nn.Linear(hidden_size, output_size)
+            #nn.Linear(hidden_size, hidden_size),
             #nn.ReLU(),
-            #nn.Linear(output_size, output_size),
-            #nn.ReLU()   
+            nn.Linear(hidden_size, output_size)
         )
 
     def forward(self, x):
@@ -27,7 +28,7 @@ class Linear_QNet(nn.Module):
         torch.save(self, file_name)
 
 class QTrainer:
-    def __init__(self, model, lr, gamma,decay_iterations=50_000, iter_growth_val = 1.1,ogamma=0.7):
+    def __init__(self, model, lr, gamma,decay_iterations=100, iter_growth_val = 1.1,ogamma=0.7):
         self.lr = lr
         self.gamma = gamma
         self.decay_iterations = decay_iterations
@@ -40,7 +41,7 @@ class QTrainer:
         self.criterion = nn.MSELoss()
         self.iterations = 0
 
-    def train_step(self, state, action, reward, next_state, done):
+    def train_step2(self, state, action, reward, next_state, done):
         BATCH_SIZE = 1  # from agent.py
         self.iterations += 1
         if self.iterations*BATCH_SIZE > self.decay_iterations:
@@ -48,15 +49,12 @@ class QTrainer:
             self.decay_iterations = self.decay_iterations + (BATCH_SIZE * self.decay_steps) * self.iter_growth_val
             self.decay_steps += 1
             if self.decay_steps < 5:
-                if self.decay_iterations >20000: #was 500K
-                    self.decay_iterations = 20000
+                if self.decay_iterations >40000: #was 500K
+                    self.decay_iterations = 40000
             else:
                 scheduled_lr = self.scheduler.state_dict()['_last_lr']
-                self.decay_iterations = 20_000 + 0.01/float(scheduled_lr[0])
+                self.decay_iterations = 40_000 + 0.5/float(scheduled_lr[0])
                 print("adding to exponential decay iteraions ",scheduled_lr,self.decay_iterations)
-            #print("dropping learning rate ",self.lr,self.lr/self.decay_ratio)
-            #self.lr = self.lr / self.decay_ratio
-            #self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
             print(" ************************************ Scheduler.step() *****************************", )
             self.scheduler.step()
             print(" ************************************")
@@ -84,7 +82,66 @@ class QTrainer:
         for idx in range(len(done)):
             Q_new = reward[idx]
             if not done[idx]:
-                Q_new = reward[idx] + self.gamma * torch.max(self.model(next_state[idx]))
+                ns = next_state[idx]
+                a = self.model(ns)
+                Q_new = reward[idx] + self.gamma * torch.max(a)
+
+            target[idx][torch.argmax(action[idx]).item()] = Q_new
+    
+        # 2: Q_new = r + y * max(next_predicted Q value) -> only do this if not done
+        self.optimizer.zero_grad()
+        loss = self.criterion(target, pred)
+        loss.backward()
+        self.optimizer.step()
+
+    def train_step(self, state, action, reward, next_state, done):
+             
+        batch_step = True
+
+        state = torch.tensor(state, dtype=torch.float)
+        next_state = torch.tensor(next_state, dtype=torch.float)
+        action = torch.tensor(action, dtype=torch.int32)
+        reward = torch.tensor(reward, dtype=torch.float)
+
+        if len(state.shape) == 1:
+            batch_step = False
+            state = torch.unsqueeze(state, 0)
+            next_state = torch.unsqueeze(next_state, 0)
+            action = torch.unsqueeze(action, 0)
+            reward = torch.unsqueeze(reward, 0)
+            done = (done, )
+        
+
+        if batch_step == True:
+            self.iterations += 1
+            if self.iterations > self.decay_iterations:
+                self.iterations = 0 
+                self.decay_iterations = self.decay_iterations * self.iter_growth_val
+                self.decay_steps += 1
+                if self.decay_steps < 5:
+                    if self.decay_iterations > 200: #was 500K
+                        self.decay_iterations = 200
+                else:
+                    scheduled_lr = self.scheduler.state_dict()['_last_lr']
+                    self.decay_iterations = self.decay_iterations + 0.001/float(scheduled_lr[0])
+                    print("adding to exponential decay iteraions ",scheduled_lr,self.decay_iterations)
+                print(" ************************************ Scheduler.step() *****************************", )
+                self.scheduler.step()
+                print(" ************************************")
+                print(self.scheduler.state_dict())
+                print(" ************************************ Scheduler.step() COMPLETE *********************", )
+            else:
+                if self.iterations % 100000 == 0:
+                    print("Iteration ",self.iterations, " Batch_iteration ", self.iterations*BATCH_SIZE, " of Decay Iterations ", self.decay_iterations)    
+            
+        pred = self.model(state)
+        target = pred.clone()
+        for idx in range(len(done)):
+            Q_new = reward[idx]
+            if not done[idx]:
+                ns = next_state[idx]
+                a = self.model(ns)
+                Q_new = reward[idx] + self.gamma * torch.max(a)
 
             target[idx][torch.argmax(action[idx]).item()] = Q_new
     
@@ -95,7 +152,7 @@ class QTrainer:
         self.optimizer.step()
 
 
-    def save(self, filename='model'):
+    def save(self, filename='model', describe=None):
         # save the model
         # save the data
         model_folder_path = './model'
@@ -114,3 +171,9 @@ class QTrainer:
             json.dump(data, outfile)
         full_filename = os.path.join(model_folder_path, filename+'.pth')
         self.model.save(full_filename)
+        full_filename = os.path.join(model_folder_path, filename+'.describe')
+        if describe is not None:
+            with open(full_filename, 'w') as outfile:
+                for i,col in describe:
+                    o = f'{i}\t {col}\n'
+                    outfile.write(o)

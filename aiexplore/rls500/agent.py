@@ -15,13 +15,12 @@ import time
 from termcolor import colored
 import json
 
-
+from hyper import BATCH_SIZE
 
 #derived from https://github.com/python-engineer/snake-ai-pytorch
 
-MAX_MEMORY = 500_000
+MAX_MEMORY = 1_000_000
 SYNTHETIC_MAX_MEMORY = 4_000_000
-BATCH_SIZE = 1000
 # random learning value with no hinting
 LR = 0.0002
 # full hinting.
@@ -68,8 +67,6 @@ class Agent:
         self.iter_growth_val = iter_growth_val
         self.ogamma = ogamma
         self.memory = deque(maxlen=MAX_MEMORY)
-        #self.hint_memory = deque(maxlen=MAX_MEMORY)
-        #self.synthetic_memory = deque(maxlen=SYNTHETIC_MAX_MEMORY)
         self.model = None
         self.game = None
         self.synthetic_data = None
@@ -87,15 +84,8 @@ class Agent:
 
         self.trainer = QTrainer(self.model, lr=lr, gamma=self.gamma,decay_iterations=decay_iterations,iter_growth_val=iter_growth_val,ogamma=ogamma)
 
-
-
-
     def get_state(self, game): 
         return game.get_state()
-        #angle = round(game.aa.alpha-game.target_alpha,3)
-        ##return np.array(state, dtype=float)
-        #state = [angle,game.target_range,game.aa.velocity]
-        #return np.array(state,dtype=float)
 
     def add_fire_data(self,number=100,rng=1400):
         firedata = self.game.fire_data(rng)
@@ -105,37 +95,19 @@ class Agent:
         for s in random.choices(smangle,k=number):
             self.memory.append(s)
 
-        #if number > len(self.synthetic_memory):
-        #    number = len(self.synthetic_memory)
-        #for s in random.choices(self.synthetic_memory,k=number):
-        #    self.memory.append(s)
-
     def synthetic_data(self):
         self.synthetic_data = game.synthetic_data()
 
     def remember(self, state, action, reward, next_state, done):
             self.memory.append((state, action, reward, next_state, done)) 
-    
-    #def hint_remember(self, state, action, reward, next_state, done):
-    #    self.hint_memory.append((state, action, reward, next_state, done)) 
 
     def train_long_memory(self):
-        if len(self.memory) > BATCH_SIZE:
-            mini_sample = random.sample(self.memory, BATCH_SIZE)
+        if len(self.memory) > 10*BATCH_SIZE:
+            mini_sample = random.sample(self.memory, 10*BATCH_SIZE)
         else:
             mini_sample = self.memory
         states, actions, rewards, next_states, dones = zip(*mini_sample)
         self.trainer.train_step(states, actions, rewards, next_states, dones)
-
-
-    #def train_long_memory_hint(self):
-    #    if len(self.hint_memory) > BATCH_SIZE:
-    #        mini_sample = random.sample(self.hint_memory, BATCH_SIZE)
-    #    else:
-    #        mini_sample = random.sample(self.hint_memory, len(self.hint_memory))
-    #    states, actions, rewards, next_states, dones = zip(*mini_sample)
-    #    self.trainer.train_step(states, actions, rewards, next_states, dones)
-
  
     def train_short_memory(self, state, action, reward, next_state, done):
         self.trainer.train_step(state, action, reward, next_state, done)
@@ -143,21 +115,6 @@ class Agent:
     def _app_specific_hint(self,game):
         # instead of guessing provide a hint based on knowledge of the application
         return game.hint()
-
-   # def get_action_OLD(self, state):
-   #     if (self.n_games > 20):
-   #             #self.epsilon_max += 1
-   #             self.epsilon_max = self.epsilon *10
-   #         
-   #     if random.randint(0, self.epsilon_max) < self.epsilon:
-   #         move = random.choice(action_list)
-   #         final_move = action_onehot[move]
-   #     else:
-   #         state0 = torch.tensor(state, dtype=torch.float)
-   #         prediction = self.model(state0)
-   #         move = int(torch.argmax(prediction).item())
-   #         final_move = int_onehot[move]
-   #     return final_move
 
     def get_action(self, state):
         state0 = torch.tensor(state, dtype=torch.float)
@@ -193,7 +150,6 @@ class Agent:
                 -math.pi/720,-math.pi/512,-math.pi/256,-math.pi/128, -math.pi/64, -math.pi/32,-math.pi/16,-math.pi/12, -math.pi/8, -math.pi/6,-math.pi/4,-math.pi/3.5,-math.pi/3,-math.pi/2.5,-math.pi/2]:
             a = []
             col = ""
-            #for r in [50,100,200,300,400,500,600,700,900,1000,1100,1200,1300,1400]:
             for r in range(10,720,20):
                 action = self.get_model_action([round(i,3), r,self.game.aa.velocity])
                 a.append((action,[round(i,3),r,self.game.aa.velocity]))
@@ -216,18 +172,13 @@ class Agent:
     def model_describe_print(self,episode):
             training = self.trainer.scheduler.state_dict()
             cols = self.model_describe() 
-            #print("\033[F")
-            #print("\033[F")
-
-            #for a,b in cols:
-            #    print("\033[F")
             print(self.n_games,episode,training['_last_lr']," ###############################################################")
             for i,col in cols:
                 print(i,"\t",col)
             print("#######################################################################################")
 
-    def save(self,filename):
-            self.trainer.save(filename)
+    def save(self,filename, describe=None):
+            self.trainer.save(filename,describe)
 
 def train(lr=0.0001, episodes=300_000_000,ogamma=0.7,decay_iterations=40_000):
     plot_scores = []
@@ -257,20 +208,19 @@ def train(lr=0.0001, episodes=300_000_000,ogamma=0.7,decay_iterations=40_000):
     old_used_hint = 0
     old_used_model = 0
     old_used_rnd = 0
-    hint = True
+    hint = False
     while episode < episodes:
         episode += 1
 
         # get old state
         state_old = agent.get_state(game)
-
         disable_hint = 0
         if hint == False: 
             action_strategy = random.randint(disable_hint,max_rnd)
-            if  action_strategy <= 1 : 
+            if action_strategy in [0,1,3,5,7,9,11,13]: 
                 used_hint += 1
                 final_move = action_onehot[agent._app_specific_hint(game)]
-            elif action_strategy >= 2 and action_strategy <= 10:
+            elif action_strategy in [2,4,6,8,10,12,14]:
                 used_rnd +=1
                 # focusing on micro moves as these are in the small cone whereas the large moves are over large angles
                 final_move = action_onehot[random.choice([Action.A_UP, Action.A_DOWN, Action.FIRE,Action.A_UP_LARGE,Action.A_DOWN_LARGE])]
@@ -303,13 +253,10 @@ def train(lr=0.0001, episodes=300_000_000,ogamma=0.7,decay_iterations=40_000):
 
         # remember
         agent.remember(state_old, final_move, reward, state_new, done)
-        #if hint == True:
-        #    agent.hint_remember(state_old, final_move, reward, state_new, done)
-        #    hint = False
 
         if game.want_save == True:
             #agent.model.save()
-            agent.save(filename='model')
+            agent.save(filename='model',describe=agent.model_describe())
             game.want_save = False
 
         if done:
@@ -320,11 +267,11 @@ def train(lr=0.0001, episodes=300_000_000,ogamma=0.7,decay_iterations=40_000):
                 max_rnd +=1
                 print(f'ngames = {agent.n_games},max_rnd = {max_rnd}')
             
-            if agent.n_games < 100:
+            if agent.n_games < 150:
                 hint = True
             else:
                 hint = False
-                
+
             agent.train_long_memory()
  
             total_reward += game_reward
@@ -342,14 +289,14 @@ def train(lr=0.0001, episodes=300_000_000,ogamma=0.7,decay_iterations=40_000):
                 
             if model_score > max_model_score:
                 if model_score >  (max_model_score * 1.001):
-                    agent.save(filename='max_model.pth.'+ str(model_score))
+                    agent.save(filename='max_model.pth.'+ str(model_score),describe=agent.model_describe())
                     agent.model_describe_print(model_score)
                 max_model_score = model_score
 
 #            if max_model_score == model_score or score >= record or (agent.n_games %10) == 0:
             if  (agent.n_games %1) == 0:
                 record = score
-                agent.save(filename='model.pth.'+ str(episode))
+                agent.save(filename='model.pth.'+ str(episode),describe=agent.model_describe())
                 #agent.model_describe()
             print(f'used_hint = {used_hint-old_used_hint}/{used_hint}, used_model = {used_model-old_used_model}/{used_model}, used_rnd = {used_rnd-old_used_rnd}/{used_rnd}')
             old_used_hint = used_hint 
@@ -439,7 +386,10 @@ if __name__ == '__main__':
 
     #trying 2 hidden layers, 32 hidden in layer.
     #train(lr=0.001,episodes=4_000_000, ogamma=0.9,decay_iterations=150_000)
-    #train(lr=0.001,episodes=5_000_000, ogamma=0.92,decay_iterations=200_000)
+    #train(lr=0.0015,episodes=5_000_000, ogamma=0.91,decay_iterations=200_000)
+    #long overnighter stopping at lr of 0.00005 for 3000 games.
+    train(lr=0.00001,episodes=5_000_000, ogamma=0.89,decay_iterations=100)
 
-    play(speed=120,filename='model.pth')
+    #play(speed=120,filename='model.pth')
+    
  
